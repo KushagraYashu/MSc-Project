@@ -8,6 +8,9 @@ public class PlayerData : MonoBehaviour
     //elo
     [SerializeField] private double _elo;
 
+    //composite skill
+    [SerializeField] private double _compositeSkill = 0;
+
     //kd ratio
     private uint _kills = 0;
     private uint _deaths = 0;
@@ -57,5 +60,11 @@ public class PlayerData : MonoBehaviour
     {
         get { return _wantToPlay; }
         set { _wantToPlay = value; }
+    }
+
+    public double CompositeSkill
+    {
+        get { return _compositeSkill; }
+        set { _compositeSkill = value; }
     }
 }

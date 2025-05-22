@@ -1448,6 +1448,9 @@ MonoBehaviour:
   IDTxt: {fileID: 1904668087589813041}
   stateTxt: {fileID: 2137452729631991682}
   typeTxt: {fileID: 2436870113578971491}
+  eloTxt: {fileID: 6295587765673580558}
+  CSTxt: {fileID: 1320666475028374909}
+  KDTxt: {fileID: 3302377054317389086}
 --- !u!114 &7032357579245575421
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1462,6 +1465,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _id: 0
   _elo: 0
+  _compositeSkill: 0
   _KD: 0
   _assistRatio: 0
   _clutchRatio: 0
