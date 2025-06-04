@@ -1,7 +1,8 @@
 using TMPro;
 using UnityEngine;
 
-public class Player : MonoBehaviour
+[System.Serializable]
+public class Player
 {
     public enum PlayerState
     {
@@ -14,7 +15,8 @@ public class Player : MonoBehaviour
     {
         Bot,
         Experienced,
-        Newbie
+        Newbie,
+        TOTAL
     }
 
     [Header("Player Settings")]
@@ -22,55 +24,40 @@ public class Player : MonoBehaviour
     public PlayerType playerType;
 
 
-    [Header("Visual Components")]
-    public GameObject playerMesh;
-    public Material[] playerMaterialsBasedOnState;
+    //[Header("Visual Components")]
+    //public GameObject playerMesh;
+    //public Material[] playerMaterialsBasedOnState;
 
-    [Header("Canvas Elements")]
-    public TextMeshProUGUI IDTxt;
-    public TextMeshProUGUI stateTxt;
-    public TextMeshProUGUI typeTxt;
-    public TextMeshProUGUI eloTxt;
-    public TextMeshProUGUI CSTxt;
-    public TextMeshProUGUI KDTxt;
+    //[Header("Canvas Elements")]
+    //public TextMeshProUGUI IDTxt;
+    //public TextMeshProUGUI stateTxt;
+    //public TextMeshProUGUI typeTxt;
+    //public TextMeshProUGUI eloTxt;
+    //public TextMeshProUGUI CSTxt;
+    //public TextMeshProUGUI KDTxt;
 
-    //internal variables
-    PlayerData playerData;
+    public PlayerData playerData;
 
     //Constructor
     public void SetPlayer(int id, double baseElo, double matchingThreshold, PlayerState state, PlayerType type)
     {
         playerState = state;
         playerType = type;
-        playerMesh.GetComponent<MeshRenderer>().material = playerMaterialsBasedOnState[(int)state];
+        //playerMesh.GetComponent<MeshRenderer>().material = playerMaterialsBasedOnState[(int)state];
 
         //initialising player data
-        if (playerData == null) playerData = GetComponent<PlayerData>();
+        if (playerData == null) playerData = new();
         playerData.SetPlayerData(id, baseElo, matchingThreshold);
 
-        UpdateCanvas();
+        //UpdateCanvas();
     }
 
-    public void UpdateCanvas()
+    public void PrintData()
     {
-        IDTxt.text = "ID: " + playerData.Id.ToString();
-        stateTxt.text = "State: " + playerState.ToString();
-        typeTxt.text = "Type: " + playerType.ToString();
-
-        eloTxt.text = "Elo: " + playerData.Elo.ToString();
-        CSTxt.text = "CS: " + playerData.CompositeSkill.ToString();
-        KDTxt.text = "KD: " + playerData.KD.ToString();
-    }
-
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        playerData = GetComponent<PlayerData>();
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
+        Debug.Log("ID: " + playerData.Id + 
+            "\tState: " + playerState + 
+            "\tType: " + playerType + 
+            "\tElo: " + playerData.Elo);
         
     }
 }

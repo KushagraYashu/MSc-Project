@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class PlayerData : MonoBehaviour
+public class PlayerData
 {
     //id
     [SerializeField] private int _id;

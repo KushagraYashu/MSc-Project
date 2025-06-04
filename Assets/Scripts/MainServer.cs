@@ -5,6 +5,13 @@ using UnityEngine;
 
 public class MainServer : MonoBehaviour
 {
+    public static MainServer instance;
+    private void Awake()
+    {
+        if (instance == null) instance = this;
+        else Destroy(this.gameObject);
+    }
+
     [Header("Player Prefab")]
     public GameObject playerPrefab;
 
@@ -136,9 +143,14 @@ public class MainServer : MonoBehaviour
         
     }
 
+    public void IntialiseEloSystem()
+    {
+        EloSystemManager.instance.SetupEloSystem();
+    }
+
     readonly int maxAttempts = 12000;       //giving the attemps some overhead (2k)
     private HashSet<int> allIDs = new();
-    int GenerateRandomID()
+    public int GenerateRandomID()
     {
         for (int attempt = 0; attempt < maxAttempts; ++attempt)
         {
