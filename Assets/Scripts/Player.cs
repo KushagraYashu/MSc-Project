@@ -7,7 +7,6 @@ public class Player
     public enum PlayerState
     {
         Idle,
-        Inactive,
         Playing
     }
 
@@ -36,10 +35,11 @@ public class Player
     //public TextMeshProUGUI CSTxt;
     //public TextMeshProUGUI KDTxt;
 
+    [SerializeField]
     public PlayerData playerData;
 
     //Constructor
-    public void SetPlayer(int id, double baseElo, double matchingThreshold, PlayerState state, PlayerType type)
+    public void SetPlayer(int id, double baseElo, int pool, double matchingThreshold, PlayerState state, PlayerType type)
     {
         playerState = state;
         playerType = type;
@@ -47,7 +47,7 @@ public class Player
 
         //initialising player data
         if (playerData == null) playerData = new();
-        playerData.SetPlayerData(id, baseElo, matchingThreshold);
+        playerData.SetPlayerData(id, baseElo, pool, matchingThreshold);
 
         //UpdateCanvas();
     }

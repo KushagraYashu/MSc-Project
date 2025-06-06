@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[System.Serializable]
 public class PlayerData
 {
     //id
@@ -7,6 +8,9 @@ public class PlayerData
 
     //elo
     [SerializeField] private double _elo;
+
+    //pool
+    [SerializeField] private int _pool = 0;
 
     //composite skill
     [SerializeField] private double _compositeSkill = 0;
@@ -31,11 +35,12 @@ public class PlayerData
 
     [SerializeField] private bool _wantToPlay = false;
 
-    public void SetPlayerData(int id, double baseElo, double matchingThreshold)
+    public void SetPlayerData(int id, double baseElo, int pool, double matchingThreshold)
     {
         _id = id;
         _elo = baseElo;
         _matchingThreshold = matchingThreshold;
+        _pool = pool;
     }
 
     //getters and setters
@@ -49,6 +54,12 @@ public class PlayerData
     {
         get { return _elo; }
         set { _elo = value; }
+    }
+
+    public int Pool
+    {
+        get { return _pool; }
+        set { _pool = value; }
     }
 
     public double KD
