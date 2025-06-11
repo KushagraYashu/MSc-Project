@@ -880,6 +880,59 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 349010059}
   m_CullTransparentMesh: 1
+--- !u!1 &379790138
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 379790139}
+  - component: {fileID: 379790140}
+  m_Layer: 0
+  m_Name: GlickoSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &379790139
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 379790138}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &379790140
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 379790138}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6b06b7642091f54d8c2fd442dfc5714, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  totalMatches: 100000
+  whichPool: 0
+  maxRoundsPerMatch: 3
+  teamSize: 5
+  eloThreshold: 50
+  team1: []
+  team2: []
+  logTeams: 1
+  poolPlayersList: []
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -1045,7 +1098,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da7df23e872f05443abe13eb7c4d0883, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  totPlayers: 10000
+  totPlayers: 1000000
   totPools: 4
   eloRangePerPool:
   - {x: 500, y: 700}
@@ -1203,7 +1256,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 671534688}
         m_TargetAssemblyTypeName: MainServer, Assembly-CSharp
-        m_MethodName: IntialiseEloSystem
+        m_MethodName: IntialiseSystem
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1419,6 +1472,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7687ac16f6a2bd340be2e72d6741050f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  totalMatches: 100000
   whichPool: 0
   maxRoundsPerMatch: 3
   teamSize: 5
@@ -2933,3 +2987,4 @@ SceneRoots:
   - {fileID: 1612282839}
   - {fileID: 575034873}
   - {fileID: 1006856609}
+  - {fileID: 379790139}

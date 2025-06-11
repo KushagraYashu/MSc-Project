@@ -9,6 +9,9 @@ public class PlayerData
     //elo
     [SerializeField] private double _elo;
 
+    //glicko
+    [SerializeField] private double _rd = 350f;
+
     //pool
     [SerializeField] private int _pool = 0;
 
@@ -56,6 +59,12 @@ public class PlayerData
         set { _elo = value; }
     }
 
+    public double RD
+    {
+        get { return _rd; }
+        set { _rd = value; }
+    }
+
     public int Pool
     {
         get { return _pool; }
@@ -77,5 +86,17 @@ public class PlayerData
     {
         get { return _compositeSkill; }
         set { _compositeSkill = value; }
+    }
+
+    public int GamesPlayed
+    {
+        get { return (int)_gamesPlayed; }
+        set { _gamesPlayed = (uint)value; }
+    }
+
+    public int Wins
+    {
+        get { return (int)_wins; }
+        set { _wins = (uint)value; }
     }
 }

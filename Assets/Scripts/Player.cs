@@ -1,3 +1,5 @@
+using NUnit.Framework;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -22,6 +24,15 @@ public class Player
     public PlayerState playerState;
     public PlayerType playerType;
 
+    [Header("Pool")]
+    public List<int> poolHistory = new();
+
+    [Header("Delta")]
+    public float totalChangeFromStart = 0f;
+
+    [Header("Glicko Debug things")]
+    public List<float> RDHistory = new();
+    public List<float> EloHistory = new();
 
     //[Header("Visual Components")]
     //public GameObject playerMesh;

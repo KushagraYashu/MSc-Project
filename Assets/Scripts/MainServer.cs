@@ -52,9 +52,10 @@ public class MainServer : MonoBehaviour
     {
     }
 
-    public void IntialiseEloSystem()
+    public void IntialiseSystem()
     {
         EloSystemManager.instance.SetupEloSystem();
+        //GlickoSystemManager.instance.SetupGlickoSystem();
     }
 
     
