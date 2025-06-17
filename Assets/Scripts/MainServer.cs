@@ -54,8 +54,8 @@ public class MainServer : MonoBehaviour
 
     public void IntialiseSystem()
     {
-        EloSystemManager.instance.SetupEloSystem();
-        //GlickoSystemManager.instance.SetupGlickoSystem();
+        //EloSystemManager.instance.SetupEloSystem();
+        GlickoSystemManager.instance.SetupGlickoSystem();
     }
 
     

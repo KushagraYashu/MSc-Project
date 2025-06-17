@@ -924,7 +924,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b6b06b7642091f54d8c2fd442dfc5714, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  totalMatches: 100000
+  totalMatches: 3
   whichPool: 0
   maxRoundsPerMatch: 3
   teamSize: 5
@@ -1564,8 +1564,8 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1006856610}
-        m_TargetAssemblyTypeName: EloSystemManager, Assembly-CSharp
+      - m_Target: {fileID: 379790140}
+        m_TargetAssemblyTypeName: GlickoSystemManager, Assembly-CSharp
         m_MethodName: CreateAMatch
         m_Mode: 1
         m_Arguments:

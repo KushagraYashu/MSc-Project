@@ -74,6 +74,7 @@ public class GlickoSystemManager : MonoBehaviour
         StartCoroutine(InitialiseGlickoSystem());
     }
 
+    int maxAttempts = 10000;
     IEnumerator InitialiseGlickoSystem()
     {
         var cp = CentralProperties.instance;
@@ -159,7 +160,7 @@ public class GlickoSystemManager : MonoBehaviour
         {
             allPlayers.AddRange(poolPlayersList[i].playersInPool);
         }
-        StartCoroutine(ExportPlayerDataToCSV(allPlayers, "GlickoSimulationResultsAfter100kMatchesOn1MPlayers"));
+        //StartCoroutine(ExportPlayerDataToCSV(allPlayers, "GlickoSimulationResultsAfter100kMatchesOn1MPlayers"));
     }
 
     IEnumerator ExportPlayerDataToCSV(List<Player> allPlayers, string fileName)
@@ -413,8 +414,9 @@ public class GlickoSystemManager : MonoBehaviour
 
     void UpdateGlickoForPlayer(int team, Player p, float avgEloOpponentTeam, float avgRDOpponentTeam, int winner)
     {
-        double q = Math.Log(10) / 400.0;
+        double q = 0.00575646273248511421004497863671;
 
+        //An approximation of the pure glicko. I am comparing the player rating with the average rating of the opponent team and not with the individual opponent ratings. (faster on large pools and matches)
         double playerRating = p.playerData.Elo;
         double opponentRating = avgEloOpponentTeam;
 
@@ -465,7 +467,7 @@ public class GlickoSystemManager : MonoBehaviour
 
         System.Random rng = new();
 
-        int maxAttempts = 10000;
+        //
 
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
