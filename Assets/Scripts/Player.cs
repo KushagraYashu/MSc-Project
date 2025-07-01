@@ -50,7 +50,7 @@ public class Player
     public PlayerData playerData;
 
     //Constructor
-    public void SetPlayer(int id, double baseElo, int pool, double matchingThreshold, PlayerState state, PlayerType type)
+    public void SetPlayer(int id, double baseElo, double realSkill,int pool, double matchingThreshold, PlayerState state, PlayerType type)
     {
         playerState = state;
         playerType = type;
@@ -58,7 +58,7 @@ public class Player
 
         //initialising player data
         if (playerData == null) playerData = new();
-        playerData.SetPlayerData(id, baseElo, pool, matchingThreshold);
+        playerData.SetPlayerData(id, baseElo, realSkill, pool, matchingThreshold);
 
         //UpdateCanvas();
     }

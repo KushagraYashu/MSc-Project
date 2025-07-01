@@ -21,17 +21,18 @@ public class GlickoSystemManager : MonoBehaviour
     }
 
     [Header("TOTAL MATCHES")]
+    [Tooltip("Total number of matches per player")]
     public int totalMatches = 1000;
 
     [Header("Match Properties")]
-    public int whichPool = 0;
     public int maxRoundsPerMatch = 3;
     public int teamSize = 5;
     public float eloThreshold = 50f;
 
-    [Header("Teams")]
-    public List<Player> team1 = new();
-    public List<Player> team2 = new();
+    //teams are now handled matchwise, that will make the matches be able to run simultaneously.
+    //[Header("Teams")]
+    //public List<Player> team1 = new();
+    //public List<Player> team2 = new();
 
     [Header("Debug Info")]
     public bool logTeams = true;
@@ -56,6 +57,9 @@ public class GlickoSystemManager : MonoBehaviour
     [Header("Players")]
     [SerializeField]
     public PoolPlayers[] poolPlayersList;
+
+    System.Random rng = new();
+
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -96,6 +100,8 @@ public class GlickoSystemManager : MonoBehaviour
         int totalPlayers = (int)cp.totPlayers;
         int maxIDs = totalPlayers + Mathf.FloorToInt(0.2f * totalPlayers);
         int maxAttempts = totalPlayers + Mathf.FloorToInt(0.3f * totalPlayers);
+        float minEloGlobal = cp.eloRangePerPool[0].x;
+        float maxEloGlobal = cp.eloRangePerPool[cp.totPools - 1].y;
         for (int i = 0; i < cp.totPools; i++)
         {
             float minElo = cp.eloRangePerPool[i].x;
@@ -106,12 +112,15 @@ public class GlickoSystemManager : MonoBehaviour
                 Player newPlayer = new();
                 newPlayer.SetPlayer(MainServer.instance.GenerateRandomID(maxAttempts, maxIDs),
                                     UnityEngine.Random.Range(minElo, maxElo),
+                                    UnityEngine.Random.Range(minEloGlobal, maxEloGlobal),
                                     i,
                                     eloThreshold,
                                     Player.PlayerState.Idle,
                                     (i > 0) ? Player.PlayerType.Experienced : Player.PlayerType.Newbie);
 
-                newPlayer.playerData.RD = UnityEngine.Random.Range(150f, 350f);
+                newPlayer.playerData.MatchesToPlay = totalMatches;
+
+                newPlayer.playerData.RD = 200f;
 
                 newPlayer.RDHistory.Add((float)newPlayer.playerData.RD);
                 newPlayer.EloHistory.Add((float)newPlayer.playerData.Elo);
@@ -134,44 +143,50 @@ public class GlickoSystemManager : MonoBehaviour
 
     public void CreateAMatch()
     {
-        StartCoroutine(SimulateForMatches());
+        StartCoroutine(SimulateMatches());
     }
 
-    int curMatch = 0;
-    IEnumerator SimulateForMatches()
+    int totalMatchesSimulated = 0;
+    IEnumerator SimulateMatches()
     {
-        for (curMatch = 0; curMatch < totalMatches; curMatch++)
+        List<Player> allPlayers = poolPlayersList.SelectMany(pool => pool.playersInPool).ToList();
+
+        int totalRemainingPlayers = allPlayers.Count(p => p.playerData.MatchesToPlay > 0);
+
+        while (totalRemainingPlayers > 0)
         {
-            whichPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
-            bool done = false;
+            int randomPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
 
-            StartTeamSplit(poolPlayersList[whichPool].playersInPool, () =>
-            {
-                done = true;
-            });
+            StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
+            totalMatchesSimulated++;
 
-            while (!done) yield return null;
+            totalRemainingPlayers = allPlayers.Count(p => p.playerData.MatchesToPlay > 0);
 
             yield return null;
         }
 
-        var allPlayers = poolPlayersList[0].playersInPool;
-        for (int i = 1; i < poolPlayersList.Length; i++)
-        {
-            allPlayers.AddRange(poolPlayersList[i].playersInPool);
-        }
-        //StartCoroutine(ExportPlayerDataToCSV(allPlayers, "GlickoSimulationResultsAfter100kMatchesOn1MPlayers"));
+        Debug.Log($"All players in all pools have completed their required matches. Total matches: {totalMatchesSimulated}");
+
+        // Wait for final matches to complete
+        yield return new WaitForSecondsRealtime(10f);
+
+        allPlayers = poolPlayersList.SelectMany(p => p.playersInPool).ToList();
+
+        string time = System.DateTime.Now.ToString("dd-MM-yyyy_HH-mm-ss");
+        StartCoroutine(ExportPlayerDataToCSV(allPlayers, time + $"GlickoSystem-For-{totalMatches}Matches-PerPlayer-TotPlayerCount-{allPlayers.Count}"));
     }
 
     IEnumerator ExportPlayerDataToCSV(List<Player> allPlayers, string fileName)
     {
+        Debug.Log($"Exporting {allPlayers.Count} players to CSV...");
+
         StringBuilder csvContent = new();
 
         int yieldFrequency = 5000; // Yield every 5000 players
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,Elo,RD,Pool,TotalDelta,GamesPlayed,Wins,EloHistory,RDHistory,PoolHistory");
+        csvContent.AppendLine("PlayerID,Elo,RD,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,EloHistory,RDHistory,PoolHistory");
 
         foreach (var player in allPlayers)
         {
@@ -181,7 +196,7 @@ public class GlickoSystemManager : MonoBehaviour
             string poolHistoryStr = string.Join(";", player.poolHistory);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.Elo},{player.playerData.RD},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{eloHistoryStr}\",\"{rdHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.Elo},{player.playerData.RD},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{eloHistoryStr}\",\"{rdHistoryStr}\",\"{poolHistoryStr}\",";
 
             csvContent.AppendLine(line);
 
@@ -201,16 +216,33 @@ public class GlickoSystemManager : MonoBehaviour
         Debug.Log($"Excel-compatible CSV successfully written to: {filePath}");
     }
 
-    public async void StartTeamSplit(List<Player> playerPool, Action onMatchDone)
+    //optimised in-place shuffle method for lists (Fisher–Yates)
+    void Shuffle<T>(List<T> list)
     {
-        playerPool = playerPool.OrderBy(p => UnityEngine.Random.value).ToList();
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+    }
 
-        bool teamsCreated = await TrySplitFairTeamsAsync(playerPool);
+    public void StartTeamSplit(List<Player> playerPool, int whichPool, int matchSim)
+    {
+        List<Player> team1 = new();
+        List<Player> team2 = new();
+
+        Shuffle(playerPool);
+
+        bool teamsCreated = TrySplitFairTeamsAsync(playerPool, ref team1, ref team2);
 
         if ((teamsCreated))
         {
-            Debug.Log("Do the Match");
-            StartCoroutine(SimulateMatch(onMatchDone));
+            //Debug.Log("Do the Match");
+            foreach (var p in team1.Concat(team2))
+            {
+                p.playerData.MatchesToPlay--;
+            }
+            StartCoroutine(SimulateMatch(team1, team2, matchSim));
         }
         else
         {
@@ -227,11 +259,11 @@ public class GlickoSystemManager : MonoBehaviour
                 whichPool++;
             }
 
-            StartTeamSplit(combinedPool, onMatchDone);
+            StartTeamSplit(combinedPool, whichPool, matchSim);
         }
     }
 
-    void UpdatePlayerStatusForBothTeams(bool playing = false)
+    void UpdatePlayerStatusForBothTeams(ref List<Player> team1, ref List<Player> team2, bool playing = false)
     {
         if (playing)
         {
@@ -258,14 +290,11 @@ public class GlickoSystemManager : MonoBehaviour
         }
     }
 
-    IEnumerator SimulateMatch(Action onComplete)
+    IEnumerator SimulateMatch(List<Player> team1, List<Player> team2, int matchSim)
     {
-        UpdatePlayerStatusForBothTeams(true);
-
         int team1wins = 0;
         int team2wins = 0;
 
-        System.Random rng = new();
 
         for (int round = 0; round < maxRoundsPerMatch; round++)
         {
@@ -281,7 +310,8 @@ public class GlickoSystemManager : MonoBehaviour
                 Player p1 = team1Shuffled[i];
                 Player p2 = team2Shuffled[i];
 
-                double p1WinProb = 1.0 / (1.0 + Math.Pow(10, (p2.playerData.Elo - p1.playerData.Elo) / 400.0));
+                //calculating win probability based on real skill rather than elo
+                double p1WinProb = 1.0 / (1.0 + Math.Pow(10, (p2.playerData.RealSkill - p1.playerData.RealSkill) / 400.0));
 
                 double roll = rng.NextDouble();
                 bool p1Win = roll < p1WinProb;
@@ -295,7 +325,10 @@ public class GlickoSystemManager : MonoBehaviour
                     team2Score++;
                 }
 
-                yield return null;
+                if (i == team1.Count - 1)
+                    yield return null;
+
+                //yield return null;
                 //yield return new WaitForSeconds(0.5f); // Simulate a delay for each 1v1
             }
 
@@ -308,7 +341,7 @@ public class GlickoSystemManager : MonoBehaviour
                 team2wins++;
             }
 
-            Debug.Log($"Round {round + 1}: Team 1: {team1Score}, Team 2: {team2Score}");
+            //Debug.Log($"Round {round + 1}: Team 1: {team1Score}, Team 2: {team2Score}");
 
             yield return null;
             //yield return new WaitForSeconds(1f); // Simulate a delay for each round
@@ -333,7 +366,7 @@ public class GlickoSystemManager : MonoBehaviour
         float avgRDTeam1 = team1.Average(p => (float)p.playerData.RD);
         float avgRDTeam2 = team2.Average(p => (float)p.playerData.RD);
 
-        Debug.Log("Updating Ratings based on RD...");
+        //Debug.Log("Updating Ratings based on RD...");
         // Elo update for team 1
         foreach (var p in team1)
         {
@@ -358,15 +391,9 @@ public class GlickoSystemManager : MonoBehaviour
             yield return null;
         }
 
-        UpdatePlayerStatusForBothTeams(false);
+        UpdatePlayerStatusForBothTeams(ref team1, ref team2, false);
 
-        if(curMatch < totalMatches - 1)
-        {
-            team1.Clear();
-            team2.Clear();
-        }
-
-        onComplete?.Invoke();
+        Debug.LogWarning(matchSim + " Match Simulation Completed!");
     }
 
     void CheckRankDerank(Player p)
@@ -408,7 +435,7 @@ public class GlickoSystemManager : MonoBehaviour
 
             p.poolHistory.Add(newPool);
 
-            Debug.Log($"Player {p.playerData.Id} moved from Pool {currentPool} to Pool {newPool} (Elo: {elo})");
+            Debug.Log($"Player {p.playerData.Id} moved from Pool {currentPool} to Pool {newPool} (Elo: {elo} Real Skill: {p.playerData.RealSkill})");
         }
     }
 
@@ -447,10 +474,10 @@ public class GlickoSystemManager : MonoBehaviour
         p.EloHistory.Add((float)newRating);
         p.totalChangeFromStart += (float)delta;
 
-        Debug.Log($"Team {team} - Player {p.playerData.Id} Elo: {newRating:F2} (Delta: {delta:F2}), New RD: {newRD:F2}");
+        //Debug.Log($"Team {team} - Player {p.playerData.Id} Elo: {newRating:F2} (Delta: {delta:F2}), New RD: {newRD:F2}");
     }
 
-    public async Task<bool> TrySplitFairTeamsAsync(List<Player> pool)
+    public bool TrySplitFairTeamsAsync(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
     {
         team1.Clear();
         team2.Clear();
@@ -464,10 +491,6 @@ public class GlickoSystemManager : MonoBehaviour
             Debug.LogError($"Not enough IDLE players. Needed: {totalRequired}, Found: {idlePlayers.Count}");
             return false;
         }
-
-        System.Random rng = new();
-
-        //
 
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
@@ -502,6 +525,8 @@ public class GlickoSystemManager : MonoBehaviour
                 team1 = t1;
                 team2 = t2;
 
+                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+
                 if (logTeams)
                 {
                     Debug.Log($"Fair match found! Elo diff: {Mathf.Abs(avgElo1 - avgElo2)}");
@@ -511,10 +536,6 @@ public class GlickoSystemManager : MonoBehaviour
 
                 return true;
             }
-
-            // Let Unity breathe
-            if (attempt % 10 == 0)
-                await Task.Yield();
         }
 
         Debug.LogWarning("No fair team found after 10,000 random samples.");

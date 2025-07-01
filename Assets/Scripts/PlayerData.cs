@@ -9,6 +9,9 @@ public class PlayerData
     //elo
     [SerializeField] private double _elo;
 
+    //real skill
+    [SerializeField] private double _realSkill = 0;
+
     //glicko
     [SerializeField] private double _rd = 350f;
 
@@ -30,6 +33,7 @@ public class PlayerData
     [SerializeField] private uint _clutchRatio = 0;
 
     //experience
+    [SerializeField] private uint _matchesToPlay = 0;
     [SerializeField] private uint _gamesPlayed = 0;
     private uint _wins = 0;
 
@@ -38,10 +42,11 @@ public class PlayerData
 
     [SerializeField] private bool _wantToPlay = false;
 
-    public void SetPlayerData(int id, double baseElo, int pool, double matchingThreshold)
+    public void SetPlayerData(int id, double baseElo, double realSkill, int pool, double matchingThreshold)
     {
         _id = id;
         _elo = baseElo;
+        _realSkill = realSkill;
         _matchingThreshold = matchingThreshold;
         _pool = pool;
     }
@@ -57,6 +62,12 @@ public class PlayerData
     {
         get { return _elo; }
         set { _elo = value; }
+    }
+
+    public double RealSkill
+    {
+        get { return _realSkill; }
+        set { _realSkill = value; }
     }
 
     public double RD
@@ -92,6 +103,12 @@ public class PlayerData
     {
         get { return (int)_gamesPlayed; }
         set { _gamesPlayed = (uint)value; }
+    }
+
+    public int MatchesToPlay
+    {
+        get { return (int)_matchesToPlay; }
+        set { _matchesToPlay = (uint)value; }
     }
 
     public int Wins

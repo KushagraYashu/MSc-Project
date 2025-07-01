@@ -52,18 +52,21 @@ public class MainServer : MonoBehaviour
     {
     }
 
-    public void IntialiseSystem()
+    public void IntialiseEloSystem()
     {
-        //EloSystemManager.instance.SetupEloSystem();
+        EloSystemManager.instance.SetupEloSystem();
+    }
+
+    public void IntialiseGlickoSystem()
+    {
         GlickoSystemManager.instance.SetupGlickoSystem();
     }
 
-    
     private HashSet<int> allIDs = new();
     private System.Random rng = new();
     public int GenerateRandomID(int maxAttempts, int maxIDs)
     {
-        for (int attempt = 0; attempt < 1000; attempt++) // prevent infinite loop
+        for (int attempt = 0; attempt < maxAttempts; attempt++) // prevent infinite loop
         {
             int id = rng.Next(0, maxIDs);
             if (!allIDs.Contains(id))

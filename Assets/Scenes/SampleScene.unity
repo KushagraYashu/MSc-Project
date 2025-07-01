@@ -924,13 +924,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b6b06b7642091f54d8c2fd442dfc5714, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  totalMatches: 3
-  whichPool: 0
+  totalMatches: 10
   maxRoundsPerMatch: 3
   teamSize: 5
   eloThreshold: 50
-  team1: []
-  team2: []
   logTeams: 1
   poolPlayersList: []
 --- !u!1 &410087039
@@ -1098,7 +1095,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da7df23e872f05443abe13eb7c4d0883, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  totPlayers: 1000000
+  totPlayers: 100
   totPools: 4
   eloRangePerPool:
   - {x: 500, y: 700}
@@ -1106,10 +1103,10 @@ MonoBehaviour:
   - {x: 900, y: 1100}
   - {x: 1100, y: 1300}
   playerDistributionInPools:
-  - 19
-  - 60
   - 20
-  - 1
+  - 40
+  - 20
+  - 20
 --- !u!1 &671534686
 GameObject:
   m_ObjectHideFlags: 0
@@ -1256,7 +1253,19 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 671534688}
         m_TargetAssemblyTypeName: MainServer, Assembly-CSharp
-        m_MethodName: IntialiseSystem
+        m_MethodName: IntialiseEloSystem
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 671534688}
+        m_TargetAssemblyTypeName: MainServer, Assembly-CSharp
+        m_MethodName: 
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1472,13 +1481,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7687ac16f6a2bd340be2e72d6741050f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  totalMatches: 100000
-  whichPool: 0
+  totalMatches: 30
   maxRoundsPerMatch: 3
   teamSize: 5
   eloThreshold: 50
-  team1: []
-  team2: []
   logTeams: 1
   poolPlayersList: []
 --- !u!1 &1102605672
@@ -1564,9 +1570,21 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
+      - m_Target: {fileID: 1006856610}
+        m_TargetAssemblyTypeName: EloSystemManager, Assembly-CSharp
+        m_MethodName: CreateAMatch
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
       - m_Target: {fileID: 379790140}
         m_TargetAssemblyTypeName: GlickoSystemManager, Assembly-CSharp
-        m_MethodName: CreateAMatch
+        m_MethodName: 
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
