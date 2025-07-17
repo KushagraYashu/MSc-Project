@@ -34,6 +34,12 @@ public class Player
     public List<float> RDHistory = new();
     public List<float> EloHistory = new();
 
+    [Header("Trueskill debug things")]
+    public List<double> muHistory = new();
+    public List<double> sigmaHistory = new();
+    public List<double> conservativeValHistory = new();
+    public List<double> scaledRatingHistory = new();
+
     //[Header("Visual Components")]
     //public GameObject playerMesh;
     //public Material[] playerMaterialsBasedOnState;

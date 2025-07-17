@@ -1,4 +1,6 @@
 using UnityEngine;
+using Moserware.Skills;
+using UnityEditor.ShaderGraph.Internal;
 
 [System.Serializable]
 public class PlayerData
@@ -14,6 +16,9 @@ public class PlayerData
 
     //glicko
     [SerializeField] private double _rd = 350f;
+
+    //moserware trueskill
+    [SerializeField] private Rating _trueSkillRating = GameInfo.DefaultGameInfo.DefaultRating;
 
     //pool
     [SerializeField] private int _pool = 0;
@@ -76,6 +81,13 @@ public class PlayerData
         set { _rd = value; }
     }
 
+    public Rating TrueSkillRating
+    {
+        get { return _trueSkillRating; }
+        set { _trueSkillRating = value; }
+    }
+      
+
     public int Pool
     {
         get { return _pool; }
@@ -115,5 +127,41 @@ public class PlayerData
     {
         get { return (int)_wins; }
         set { _wins = (uint)value; }
+    }
+
+    public float TrueSkillScaled(float minGlobal, float maxGlobal)
+    {
+        double conservative = _trueSkillRating.ConservativeRating;
+        double normalised = (conservative - 0) / 50;
+        double scaled = minGlobal + normalised * (maxGlobal - minGlobal);
+
+        return (float)scaled;
+    }
+
+
+    const double defaultMu = 25;
+    const double defaultSigma = 8.33333333; // mu / 3
+    const double defaultConservativeRange = 50; //(0 to 50)
+    public void ConvertToTrueSkill(
+        float playerRating,
+        float minPool,
+        float maxPool,
+        float minGlobal,
+        float maxGlobal)
+    {
+        // 1. Normalize player rating to 0-1 range within pool
+        double normalisedPoolRating = (playerRating - minPool) / (maxPool - minPool);
+
+        // 2. Scale to global range (optional - only needed if pools are uneven)
+        double normalisedGlobalRating = (minPool - minGlobal + (playerRating - minPool)) / (maxGlobal - minGlobal);
+
+        // 3. Calculate target conservative rating (0-50)
+        double targetConservative = normalisedGlobalRating * defaultConservativeRange;
+
+        // 4. Solve for mu that satisfies: mu - 3sigma = targetConservative
+        // Using default sigma for new players
+        double targetMu = targetConservative + 3 * defaultSigma;
+
+        _trueSkillRating = new Rating(targetMu, defaultSigma);
     }
 }

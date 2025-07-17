@@ -12,6 +12,8 @@ public class CentralProperties : MonoBehaviour
 
     public uint totPlayers;
 
+    public int totSmurfs;
+
     public int totPools = 4;
 
     public Vector2[] eloRangePerPool;

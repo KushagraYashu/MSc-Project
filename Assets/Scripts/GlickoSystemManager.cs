@@ -1,15 +1,10 @@
-using NUnit.Framework;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.Analytics;
-using UnityEngine.UI;
 
 public class GlickoSystemManager : MonoBehaviour
 {
@@ -58,8 +53,11 @@ public class GlickoSystemManager : MonoBehaviour
     [SerializeField]
     public PoolPlayers[] poolPlayersList;
 
-    System.Random rng = new();
+    List<double> MSEs = new();
+    List<int> smurfPlayerIDs = new();
+    int smurfCount = 0;
 
+    System.Random rng = new();
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -78,7 +76,31 @@ public class GlickoSystemManager : MonoBehaviour
         StartCoroutine(InitialiseGlickoSystem());
     }
 
-    int maxAttempts = 10000;
+    //using Box-Muller transformation to generate normally distributed values
+    float GenerateNormallyDistributedRealSkill(float min, float max)
+    {
+        double mean = (min + max) / 2.0;
+        double stdDev = (max - min) / 6.0; // 99.7% of values will fall within 3 standard deviations
+
+        // we can generate two (z0 and z1) normally distributed values from 2 uniformly distributed values (u0 and u1), we can then use one of normalised values to generate a normally distributed curve with given mean and std deviation.
+        double u1 = 1.0 - rng.NextDouble(); // avoid 0
+        double u2 = 1.0 - rng.NextDouble();
+        double z1 = Math.Sqrt(-2.0 * Math.Log(u1)) *
+                               Math.Sin(2.0 * Math.PI * u2);
+        double normalised = mean + stdDev * z1;
+        normalised = Mathf.Max(min, Mathf.Min(max, (float)normalised));
+
+        return (float)normalised;
+    }
+
+    float GetTop5PercentileElo(float min, float max)
+    {
+        double mean = (min + max) / 2;
+        double stdDev = (max - min) / 6;
+        float top5PercentileMin = (float)(mean + 1.645 * stdDev);
+        return UnityEngine.Random.Range(top5PercentileMin, max);
+    }
+
     IEnumerator InitialiseGlickoSystem()
     {
         var cp = CentralProperties.instance;
@@ -109,10 +131,25 @@ public class GlickoSystemManager : MonoBehaviour
 
             for (int j = 0; j < poolPlayers[i]; j++)
             {
+                float elo = UnityEngine.Random.Range(minElo, maxElo);
+                float realSkill = 0;
+                int ID = MainServer.instance.GenerateRandomID(maxAttempts, maxIDs);
+
+                if (i == 0 && smurfCount < CentralProperties.instance.totSmurfs)  //putting smurfs in the first pool
+                {
+                    realSkill = GetTop5PercentileElo(minEloGlobal, maxEloGlobal);
+                    smurfPlayerIDs.Add(ID);
+                    smurfCount++;
+                }
+                else
+                {
+                    realSkill = GenerateNormallyDistributedRealSkill(minEloGlobal, maxEloGlobal);
+                }
+
                 Player newPlayer = new();
-                newPlayer.SetPlayer(MainServer.instance.GenerateRandomID(maxAttempts, maxIDs),
-                                    UnityEngine.Random.Range(minElo, maxElo),
-                                    UnityEngine.Random.Range(minEloGlobal, maxEloGlobal),
+                newPlayer.SetPlayer(ID,
+                                    elo,
+                                    realSkill,
                                     i,
                                     eloThreshold,
                                     Player.PlayerState.Idle,
@@ -146,12 +183,46 @@ public class GlickoSystemManager : MonoBehaviour
         StartCoroutine(SimulateMatches());
     }
 
+    IEnumerator CalculateMSE()
+    {
+        float totalError = 0f;
+        uint totalPlayers = CentralProperties.instance.totPlayers;
+
+        for (int i = 0; i < poolPlayersList.Length; i++)
+        {
+            var pool = poolPlayersList[i].playersInPool;
+            for (int j = 0; j < pool.Count; j++)
+            {
+                float elo = (float)pool[j].playerData.Elo;
+                float realSkill = (float)pool[j].playerData.RealSkill;
+                float error = elo - realSkill;
+
+                totalError += error * error;
+
+                if (j % 500 == 0)
+                {
+                    yield return null; //yielding occasionally to keep Unity responsive
+                }
+            }
+        }
+
+        float mse = totalError / totalPlayers;
+        MSEs.Add(mse);
+    }
+
     int totalMatchesSimulated = 0;
     IEnumerator SimulateMatches()
     {
-        List<Player> allPlayers = poolPlayersList.SelectMany(pool => pool.playersInPool).ToList();
+        List<Player> allPlayers = new();
+        for (int i = 0; i < poolPlayersList.Length; i++)
+        {
+            allPlayers.AddRange(poolPlayersList[i].playersInPool);
+        }
 
-        int totalRemainingPlayers = allPlayers.Count(p => p.playerData.MatchesToPlay > 0);
+        int totalRemainingPlayers = 0;
+        for (int i = 0; i < allPlayers.Count; i++)
+            if (allPlayers[i].playerData.MatchesToPlay > 0)
+                totalRemainingPlayers++;
 
         while (totalRemainingPlayers > 0)
         {
@@ -160,7 +231,15 @@ public class GlickoSystemManager : MonoBehaviour
             StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
             totalMatchesSimulated++;
 
-            totalRemainingPlayers = allPlayers.Count(p => p.playerData.MatchesToPlay > 0);
+            if (totalMatchesSimulated % 500 == 0)    //calculate MSE after every 500 matches
+            {
+                StartCoroutine(CalculateMSE());
+            }
+
+            totalRemainingPlayers = 0;
+            for (int i = 0; i < allPlayers.Count; i++)
+                if (allPlayers[i].playerData.MatchesToPlay > 0)
+                    totalRemainingPlayers++;
 
             yield return null;
         }
@@ -170,7 +249,11 @@ public class GlickoSystemManager : MonoBehaviour
         // Wait for final matches to complete
         yield return new WaitForSecondsRealtime(10f);
 
-        allPlayers = poolPlayersList.SelectMany(p => p.playersInPool).ToList();
+        allPlayers.Clear();
+        for (int i = 0; i < poolPlayersList.Length; i++)
+        {
+            allPlayers.AddRange(poolPlayersList[i].playersInPool);
+        }
 
         string time = System.DateTime.Now.ToString("dd-MM-yyyy_HH-mm-ss");
         StartCoroutine(ExportPlayerDataToCSV(allPlayers, time + $"GlickoSystem-For-{totalMatches}Matches-PerPlayer-TotPlayerCount-{allPlayers.Count}"));
@@ -178,25 +261,34 @@ public class GlickoSystemManager : MonoBehaviour
 
     IEnumerator ExportPlayerDataToCSV(List<Player> allPlayers, string fileName)
     {
-        Debug.Log($"Exporting {allPlayers.Count} players to CSV...");
-
         StringBuilder csvContent = new();
 
         int yieldFrequency = 5000; // Yield every 5000 players
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,Elo,RD,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,EloHistory,RDHistory,PoolHistory");
+        csvContent.AppendLine("PlayerID,Elo,RD,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,EloHistory,RDHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
 
-        foreach (var player in allPlayers)
+        string MSEListStr = string.Join(";", MSEs);
+        string smurfListStr = string.Join(";", smurfPlayerIDs);
+
+
+        for (int i = 0; i < allPlayers.Count; ++i)
         {
+            var player = allPlayers[i];
+
             // Serialise lists as semicolon-separated strings
             string eloHistoryStr = string.Join(";", player.EloHistory);
-            string rdHistoryStr = string.Join(";", player.RDHistory);
             string poolHistoryStr = string.Join(";", player.poolHistory);
+            string rdHistoryStr = string.Join(";", player.RDHistory);
 
             // Build CSV row
             string line = $"{player.playerData.Id},{player.playerData.Elo},{player.playerData.RD},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{eloHistoryStr}\",\"{rdHistoryStr}\",\"{poolHistoryStr}\",";
+
+            if (i == 0)
+            {
+                line += ($"\"{MSEListStr}\",\"{smurfListStr}\",{totalMatchesSimulated}");
+            }
 
             csvContent.AppendLine(line);
 
@@ -214,6 +306,9 @@ public class GlickoSystemManager : MonoBehaviour
         File.WriteAllText(filePath, csvContent.ToString());
 
         Debug.Log($"Excel-compatible CSV successfully written to: {filePath}");
+
+        StopAllCoroutines();
+        GC.Collect();
     }
 
     //optimised in-place shuffle method for lists (Fisher–Yates)
@@ -224,6 +319,17 @@ public class GlickoSystemManager : MonoBehaviour
             int j = rng.Next(i + 1);
             (list[i], list[j]) = (list[j], list[i]);
         }
+    }
+
+    List<T> ShuffleCopy<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+
+        return list;
     }
 
     public void StartTeamSplit(List<Player> playerPool, int whichPool, int matchSim)
@@ -238,9 +344,13 @@ public class GlickoSystemManager : MonoBehaviour
         if ((teamsCreated))
         {
             //Debug.Log("Do the Match");
-            foreach (var p in team1.Concat(team2))
+            for (int i = 0; i < team1.Count; i++)
             {
-                p.playerData.MatchesToPlay--;
+                team1[i].playerData.MatchesToPlay--;
+            }
+            for (int i = 0; i < team2.Count; i++)
+            {
+                team2[i].playerData.MatchesToPlay--;
             }
             StartCoroutine(SimulateMatch(team1, team2, matchSim));
         }
@@ -298,8 +408,8 @@ public class GlickoSystemManager : MonoBehaviour
 
         for (int round = 0; round < maxRoundsPerMatch; round++)
         {
-            List<Player> team1Shuffled = team1.OrderBy(x => rng.Next()).ToList();
-            List<Player> team2Shuffled = team2.OrderBy(x => rng.Next()).ToList();
+            List<Player> team1Shuffled = ShuffleCopy(team1);
+            List<Player> team2Shuffled = ShuffleCopy(team2);
 
             int team1Score = 0;
             int team2Score = 0;
@@ -360,11 +470,33 @@ public class GlickoSystemManager : MonoBehaviour
             winner = 2;
         }
 
-        float avgEloTeam1 = team1.Average(p => (float)p.playerData.Elo);
-        float avgEloTeam2 = team2.Average(p => (float)p.playerData.Elo);
+        float avgEloTeam1 = 0;
+        for (int i = 0; i < team1.Count; i++)
+        {
+            avgEloTeam1 += (float)team1[i].playerData.Elo;
+        }
+        avgEloTeam1 /= team1.Count;
 
-        float avgRDTeam1 = team1.Average(p => (float)p.playerData.RD);
-        float avgRDTeam2 = team2.Average(p => (float)p.playerData.RD);
+        float avgEloTeam2 = 0;
+        for (int i = 0; i < team2.Count; i++)
+        {
+            avgEloTeam2 += (float)team2[i].playerData.Elo;
+        }
+        avgEloTeam2 /= team2.Count;
+
+        float avgRDTeam1 = 0;
+        for (int i = 0; i < team1.Count; i++)
+        {
+            avgRDTeam1 += (float)team1[i].playerData.RD;
+        }
+        avgRDTeam1 /= team1.Count;
+
+        float avgRDTeam2 = 0;
+        for (int i = 0; i < team2.Count; i++)
+        {
+            avgRDTeam2 += (float)team2[i].playerData.RD;
+        }
+        avgRDTeam2 /= team2.Count;
 
         //Debug.Log("Updating Ratings based on RD...");
         // Elo update for team 1
@@ -492,6 +624,7 @@ public class GlickoSystemManager : MonoBehaviour
             return false;
         }
 
+        int maxAttempts = (int)((pool.Count * 0.2) + pool.Count);
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             HashSet<int> selectedIndices = new();
@@ -517,8 +650,19 @@ public class GlickoSystemManager : MonoBehaviour
             var t1 = selectedPlayers.Take(teamSize).ToList();
             var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
 
-            float avgElo1 = t1.Average(p => (float)p.playerData.Elo);
-            float avgElo2 = t2.Average(p => (float)p.playerData.Elo);
+            float avgElo1 = 0;
+            for (int i = 0; i < t1.Count; i++)
+            {
+                avgElo1 += (float)t1[i].playerData.Elo;
+            }
+            avgElo1 /= t1.Count;
+
+            float avgElo2 = 0;
+            for (int i = 0; i < t2.Count; i++)
+            {
+                avgElo2 += (float)t2[i].playerData.Elo;
+            }
+            avgElo2 /= t2.Count;
 
             if (Mathf.Abs(avgElo1 - avgElo2) <= eloThreshold)
             {

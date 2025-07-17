@@ -62,6 +62,11 @@ public class MainServer : MonoBehaviour
         GlickoSystemManager.instance.SetupGlickoSystem();
     }
 
+    public void InitialiseTrueSkillSystem()
+    {
+        TrueskillSystemManager.instance.SetupTrueskillSystem();
+    }
+
     private HashSet<int> allIDs = new();
     private System.Random rng = new();
     public int GenerateRandomID(int maxAttempts, int maxIDs)
