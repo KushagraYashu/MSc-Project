@@ -62,9 +62,9 @@ public class MainServer : MonoBehaviour
         GlickoSystemManager.instance.SetupGlickoSystem();
     }
 
-    public void InitialiseTrueSkillSystem()
+    public void InitialiseVanillaTrueSkillSystem()
     {
-        TrueskillSystemManager.instance.SetupTrueskillSystem();
+        VanillaTrueskillSystemManager.instance.SetupTrueskillSystem();
     }
 
     private HashSet<int> allIDs = new();

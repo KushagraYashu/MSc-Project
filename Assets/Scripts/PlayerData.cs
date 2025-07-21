@@ -1,6 +1,7 @@
 using UnityEngine;
-using Moserware.Skills;
 using UnityEditor.ShaderGraph.Internal;
+using Moserware.Skills;
+using TrueSkill2;
 
 [System.Serializable]
 public class PlayerData
@@ -17,8 +18,11 @@ public class PlayerData
     //glicko
     [SerializeField] private double _rd = 350f;
 
-    //moserware trueskill
-    [SerializeField] private Rating _trueSkillRating = GameInfo.DefaultGameInfo.DefaultRating;
+    //vanilla trueskill (moserware)
+    [SerializeField] private Moserware.Skills.Rating _trueSkillRating = GameInfo.DefaultGameInfo.DefaultRating;
+
+    //my trueskill
+    [SerializeField] private TrueSkill2.Rating _myTrueSkillRating = new();
 
     //pool
     [SerializeField] private int _pool = 0;
@@ -81,12 +85,17 @@ public class PlayerData
         set { _rd = value; }
     }
 
-    public Rating TrueSkillRating
+    public Moserware.Skills.Rating TrueSkillRating
     {
         get { return _trueSkillRating; }
         set { _trueSkillRating = value; }
     }
-      
+    
+    public TrueSkill2.Rating MyTrueSkillRating
+    {
+        get { return _myTrueSkillRating; }
+        set { _myTrueSkillRating = value; }
+    }
 
     public int Pool
     {
@@ -162,6 +171,6 @@ public class PlayerData
         // Using default sigma for new players
         double targetMu = targetConservative + 3 * defaultSigma;
 
-        _trueSkillRating = new Rating(targetMu, defaultSigma);
+        _trueSkillRating = new Moserware.Skills.Rating(targetMu, defaultSigma);
     }
 }

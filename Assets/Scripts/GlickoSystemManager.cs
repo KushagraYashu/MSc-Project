@@ -59,6 +59,8 @@ public class GlickoSystemManager : MonoBehaviour
 
     System.Random rng = new();
 
+    int lastMSEMatchCheckpoint = 0;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -80,17 +82,18 @@ public class GlickoSystemManager : MonoBehaviour
     float GenerateNormallyDistributedRealSkill(float min, float max)
     {
         double mean = (min + max) / 2.0;
-        double stdDev = (max - min) / 6.0; // 99.7% of values will fall within 3 standard deviations
+        double stdDev = (max - min) / 6.0; // ~99.7% of values fall within range
 
-        // we can generate two (z0 and z1) normally distributed values from 2 uniformly distributed values (u0 and u1), we can then use one of normalised values to generate a normally distributed curve with given mean and std deviation.
-        double u1 = 1.0 - rng.NextDouble(); // avoid 0
-        double u2 = 1.0 - rng.NextDouble();
-        double z1 = Math.Sqrt(-2.0 * Math.Log(u1)) *
-                               Math.Sin(2.0 * Math.PI * u2);
-        double normalised = mean + stdDev * z1;
-        normalised = Mathf.Max(min, Mathf.Min(max, (float)normalised));
+        while (true)
+        {
+            double u1 = 1.0 - rng.NextDouble(); // avoid 0
+            double u2 = 1.0 - rng.NextDouble();
+            double z1 = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
+            double normalised = mean + stdDev * z1;
 
-        return (float)normalised;
+            if (normalised >= min && normalised <= max)
+                return (float)normalised;
+        }
     }
 
     float GetTop5PercentileElo(float min, float max)
@@ -131,7 +134,7 @@ public class GlickoSystemManager : MonoBehaviour
 
             for (int j = 0; j < poolPlayers[i]; j++)
             {
-                float elo = UnityEngine.Random.Range(minElo, maxElo);
+                float elo = minElo;
                 float realSkill = 0;
                 int ID = MainServer.instance.GenerateRandomID(maxAttempts, maxIDs);
 
@@ -224,6 +227,8 @@ public class GlickoSystemManager : MonoBehaviour
             if (allPlayers[i].playerData.MatchesToPlay > 0)
                 totalRemainingPlayers++;
 
+        StartCoroutine(CalculateMSE());
+
         while (totalRemainingPlayers > 0)
         {
             int randomPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
@@ -231,8 +236,16 @@ public class GlickoSystemManager : MonoBehaviour
             StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
             totalMatchesSimulated++;
 
-            if (totalMatchesSimulated % 500 == 0)    //calculate MSE after every 500 matches
+            int minMatchesPlayed = int.MaxValue;
+            for (int i = 0; i < allPlayers.Count; i++)
             {
+                minMatchesPlayed = Mathf.Min(minMatchesPlayed, allPlayers[i].playerData.GamesPlayed);
+            }
+
+            // Checkpoint every 5 matches
+            if (minMatchesPlayed > lastMSEMatchCheckpoint && minMatchesPlayed % 5 == 0)
+            {
+                lastMSEMatchCheckpoint = minMatchesPlayed;
                 StartCoroutine(CalculateMSE());
             }
 
@@ -243,6 +256,8 @@ public class GlickoSystemManager : MonoBehaviour
 
             yield return null;
         }
+
+        StartCoroutine(CalculateMSE());
 
         Debug.Log($"All players in all pools have completed their required matches. Total matches: {totalMatchesSimulated}");
 

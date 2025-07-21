@@ -618,7 +618,7 @@ GameObject:
   - component: {fileID: 312355056}
   - component: {fileID: 312355057}
   m_Layer: 0
-  m_Name: TrueskillSystem
+  m_Name: VanillaTrueskillSystem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1149,10 +1149,10 @@ MonoBehaviour:
   totSmurfs: 100
   totPools: 4
   eloRangePerPool:
-  - {x: 500, y: 700}
-  - {x: 700, y: 900}
-  - {x: 900, y: 1100}
-  - {x: 1100, y: 1300}
+  - {x: 1000, y: 1400}
+  - {x: 1400, y: 1800}
+  - {x: 1800, y: 2200}
+  - {x: 2200, y: 2600}
   playerDistributionInPools:
   - 25
   - 25
@@ -1316,7 +1316,7 @@ MonoBehaviour:
         m_CallState: 2
       - m_Target: {fileID: 671534688}
         m_TargetAssemblyTypeName: MainServer, Assembly-CSharp
-        m_MethodName: 
+        m_MethodName: IntialiseGlickoSystem
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1328,7 +1328,7 @@ MonoBehaviour:
         m_CallState: 2
       - m_Target: {fileID: 671534688}
         m_TargetAssemblyTypeName: MainServer, Assembly-CSharp
-        m_MethodName: InitialiseTrueSkillSystem
+        m_MethodName: 
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1647,7 +1647,7 @@ MonoBehaviour:
         m_CallState: 2
       - m_Target: {fileID: 379790140}
         m_TargetAssemblyTypeName: GlickoSystemManager, Assembly-CSharp
-        m_MethodName: 
+        m_MethodName: CreateAMatch
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1659,7 +1659,7 @@ MonoBehaviour:
         m_CallState: 2
       - m_Target: {fileID: 312355057}
         m_TargetAssemblyTypeName: TrueskillSystemManager, Assembly-CSharp
-        m_MethodName: CreateAMatch
+        m_MethodName: 
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
