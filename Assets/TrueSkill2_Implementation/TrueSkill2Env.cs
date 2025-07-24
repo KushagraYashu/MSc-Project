@@ -10,10 +10,11 @@ namespace TrueSkill2
         public double DrawProbability { get; }
         public double Epsilon { get; } // Draw margin
 
-        public TrueSkill2Env(double beta = 1.0,                     
-                                  double tau = 10e-16,
-                                  double drawProbability = 0.01) 
-            //beta and tau are from Halo 5 data from trueskill2 whitepaper
+        public TrueSkill2Env(double beta = 600,                     
+                                  double tau = 0.00694444444444444444444444444444,
+                                  double drawProbability = 0.00)
+        //beta and tau are from Halo 5 data from trueskill2 whitepaper
+        //my simulation will not have draws, so probability of draw is 0
         {
             Beta = beta;
             Tau = tau;

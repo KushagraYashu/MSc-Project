@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEditor.ShaderGraph.Internal;
 using Moserware.Skills;
 using TrueSkill2;
+using NUnit.Framework;
+using System.Collections.Generic;
 
 [System.Serializable]
 public class PlayerData
@@ -29,22 +31,32 @@ public class PlayerData
 
     //composite skill
     [SerializeField] private double _compositeSkill = 0;
+    private double _We = 1.00;
+    private double _Wk = 125.00;
+    private double _Wa = 75.00;
+    private double _Wc = 150.00;
+    private double _Wx = 10.00;
 
     //kd ratio
     private uint _kills = 0;
     private uint _deaths = 0;
-    [SerializeField] private double _KD = 0;
+    [SerializeField] private double _KDA = 0;
 
     //assists and clutch ratios
     private uint _assists = 0;
-    [SerializeField] private uint _assistRatio = 0;
+    [SerializeField] private double _assistRatio = 0;
     private uint _clutches = 0;
-    [SerializeField] private uint _clutchRatio = 0;
+    private uint _clutchesPresented = 0;
+    [SerializeField] private double _clutchRatio = 0;
 
     //experience
     [SerializeField] private uint _matchesToPlay = 0;
     [SerializeField] private uint _gamesPlayed = 0;
+    private uint _roundsPlayed = 0;
     private uint _wins = 0;
+
+    //history
+    private List<int> _outcomes = new();
 
     //matching threshold
     private double _matchingThreshold = 0;
@@ -103,9 +115,33 @@ public class PlayerData
         set { _pool = value; }
     }
 
-    public double KD
+    public uint Kills
     {
-        get { return _KD; }
+        get { return _kills; }
+        set { _kills = value; }
+    }
+
+    public uint Deaths
+    {
+        get { return _deaths; }
+        set { _deaths = value; }
+    }
+
+    public double KDA
+    {
+        get { return _KDA; }
+    }
+
+    public uint Clutches
+    {
+        get { return _clutches; }
+        set { _clutches = value; }
+    }
+
+    public uint ClutchesPresented
+    {
+        get { return _clutchesPresented; }
+        set { _clutchesPresented = value; }
     }
 
     public bool WantToPlay
@@ -117,13 +153,18 @@ public class PlayerData
     public double CompositeSkill
     {
         get { return _compositeSkill; }
-        set { _compositeSkill = value; }
     }
 
     public int GamesPlayed
     {
         get { return (int)_gamesPlayed; }
         set { _gamesPlayed = (uint)value; }
+    }
+
+    public int RoundsPlayed
+    {
+        get { return (int)_roundsPlayed; }
+        set { _roundsPlayed = (uint)value; }
     }
 
     public int MatchesToPlay
@@ -137,6 +178,57 @@ public class PlayerData
         get { return (int)_wins; }
         set { _wins = (uint)value; }
     }
+
+    public List<int> Outcomes()
+    {
+        return _outcomes;
+    }
+
+    public void Outcomes(int value)
+    {
+        _outcomes.Add(value);
+    }
+
+    public void UpdateKDA()
+    {
+        if (_deaths == 0)
+        {
+            _KDA = _kills + _assists;
+        }
+        else
+        {
+            _KDA = (_kills + _assists) / (double)_deaths;
+        }
+    }
+
+    public void UpdateAssistRatio()
+    {
+        _assistRatio = _assists / (double)_roundsPlayed;
+    }
+
+    public void UpdateClutchRatio()
+    {
+        if (_clutchesPresented == 0)
+        {
+            _clutchRatio = 0;
+        }
+        else
+        {
+            _clutchRatio = _clutches / (double)_clutchesPresented;
+        }
+    }
+
+    public void CalculateCompositeSkill()
+    {
+        _compositeSkill = 
+            _We * _elo + 
+            _Wk * _KDA + 
+            _Wa * _assistRatio + 
+            _Wc * _clutchRatio + 
+            _Wx * _gamesPlayed
+        ;
+    }
+
 
     public float TrueSkillScaled(float minGlobal, float maxGlobal)
     {

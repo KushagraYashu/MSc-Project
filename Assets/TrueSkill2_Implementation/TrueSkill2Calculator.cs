@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace TrueSkill2
@@ -84,15 +85,22 @@ namespace TrueSkill2
         {
             var teamRating = teamRatings.First(tr => tr.Team.Contains(player));
 
-            double meanMultiplier = (player.playerData.MyTrueSkillRating.Variance) /
-                                  teamRating.TotalVariance;
-            double varianceMultiplier = (player.playerData.MyTrueSkillRating.Variance) /
-                                     teamRating.TotalVariance;
+            double multiplier = player.playerData.MyTrueSkillRating.Variance / teamRating.TotalVariance;
 
-            double newMean = player.playerData.MyTrueSkillRating.Mean + meanMultiplier * teamRating.V;
-            double newVariance = player.playerData.MyTrueSkillRating.Variance;
+            double newMean = player.playerData.MyTrueSkillRating.Mean + multiplier * teamRating.V;
+            double newVariance = player.playerData.MyTrueSkillRating.Variance * (1 - multiplier * teamRating.W);
+
+            double oldMean = player.playerData.MyTrueSkillRating.Mean;
 
             player.playerData.MyTrueSkillRating.Update(newMean, newVariance);
+
+            CustomTrueskillSystemManager.instance.PrintSomething($"Updated Player {player.playerData.Id}: " +
+                      $"New Mean: {player.playerData.MyTrueSkillRating.Mean}, " +
+                      $"Old Mean: {oldMean}");
+
+            player.scaledMuHistory.Add(player.playerData.MyTrueSkillRating.ScaledMean);
+            player.scaledSigmaHistory.Add(player.playerData.MyTrueSkillRating.ScaledStandardDeviation);
+            player.scaledConservativeValHistory.Add(player.playerData.MyTrueSkillRating.ConservativeRating);
         }
 
         private static double V(double x, double epsilon)

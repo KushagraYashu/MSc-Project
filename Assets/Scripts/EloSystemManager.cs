@@ -416,68 +416,114 @@ public class EloSystemManager : MonoBehaviour
 
     IEnumerator SimulateMatch(List<Player> team1, List<Player> team2, int matchSim)
     {
-        int team1wins = 0;
-        int team2wins = 0;
+        int team1RoundWins = 0;
+        int team2RoundWins = 0;
 
-        for(int round = 0; round < maxRoundsPerMatch; round++)
+        for (int round = 0; round < maxRoundsPerMatch; round++)
         {
             List<Player> team1Shuffled = ShuffleCopy(team1);
             List<Player> team2Shuffled = ShuffleCopy(team2);
 
-            int team1Score = 0;
-            int team2Score = 0;
+            List<Player> aliveTeam1 = new List<Player>(team1Shuffled);
+            List<Player> aliveTeam2 = new List<Player>(team2Shuffled);
 
-            //1v1s
-            for (int i = 0; i < team1.Count; i++)
+            // Track potential clutch opportunity
+            bool team1HadClutchChance = false;
+            bool team2HadClutchChance = false;
+
+            Player team1LastAlive = null;
+            Player team2LastAlive = null;
+
+            while (aliveTeam1.Count > 0 && aliveTeam2.Count > 0)
             {
-                Player p1 = team1Shuffled[i];
-                Player p2 = team2Shuffled[i];
+                Player p1 = aliveTeam1[0];
+                Player p2 = aliveTeam2[0];
 
-                //calculating win probability based on real skill rather than elo
                 double p1WinProb = 1.0 / (1.0 + Math.Pow(10, (p2.playerData.RealSkill - p1.playerData.RealSkill) / 400.0));
 
-                double roll = rng.NextDouble();
-                bool p1Win = roll < p1WinProb;
+                bool p1Wins = rng.NextDouble() < p1WinProb;
 
-                if (p1Win)
+                // Update rounds played
+                p1.playerData.RoundsPlayed++;
+                p2.playerData.RoundsPlayed++;
+
+                if (p1Wins)
                 {
-                    team1Score++;
+                    p1.playerData.Kills++;
+                    p2.playerData.Deaths++;
+
+                    // Check if p1 is in a clutch
+                    if (aliveTeam1.Count == 1 && aliveTeam2.Count >= 2)
+                    {
+                        team1HadClutchChance = true;
+                        team1LastAlive = aliveTeam1[0];
+                    }
+
+                    aliveTeam2.Remove(p2);
                 }
                 else
                 {
-                    team2Score++;
+                    p1.playerData.Deaths++;
+                    p2.playerData.Kills++;
+
+                    if (aliveTeam2.Count == 1 && aliveTeam1.Count >= 2)
+                    {
+                        team2HadClutchChance = true;
+                        team2LastAlive = aliveTeam2[0];
+                    }
+
+                    aliveTeam1.Remove(p1);
                 }
 
-                if (i == team1.Count - 1)
-                    yield return null;
+                p1.playerData.UpdateKDA();
+                p2.playerData.UpdateKDA();
 
-                //yield return null;
-                //yield return new WaitForSeconds(0.5f); // Simulate a delay for each 1v1
+                yield return null;
             }
 
-            if(team1Score > team2Score)
+            // Determine round outcome and clutch success
+            if (aliveTeam1.Count > 0)
             {
-                team1wins++;
+                team1RoundWins++;
+
+                if (team1HadClutchChance && team1LastAlive != null)
+                {
+                    team1LastAlive.playerData.Clutches++;
+                    team1LastAlive.playerData.ClutchesPresented++;
+                }
+
+                if (team2HadClutchChance && team2LastAlive != null)
+                {
+                    team2LastAlive.playerData.ClutchesPresented++;
+                }
             }
             else
             {
-                team2wins++;
+                team2RoundWins++;
+
+                if (team2HadClutchChance && team2LastAlive != null)
+                {
+                    team2LastAlive.playerData.Clutches++;
+                    team2LastAlive.playerData.ClutchesPresented++;
+                }
+
+                if (team1HadClutchChance && team1LastAlive != null)
+                {
+                    team1LastAlive.playerData.ClutchesPresented++;
+                }
             }
 
-            //Debug.Log($"Round {round + 1}: Team 1: {team1Score}, Team 2: {team2Score}");
-
             yield return null;
-            //yield return new WaitForSeconds(1f); // Simulate a delay for each round
         }
 
         int winner = 0;
 
-        if (team1wins > team2wins)
+        if (team1RoundWins > team2RoundWins)
         {
             Debug.Log("Team 1 wins the match!");
             winner = 1;
         }
-        else if (team2wins > team1wins)
+        else if (team2RoundWins > team1RoundWins)
         {
             Debug.Log("Team 2 wins the match!");
             winner = 2;

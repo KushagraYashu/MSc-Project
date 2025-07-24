@@ -22,7 +22,7 @@ namespace TrueSkill2
         private readonly double offset;
 
         public Rating(double mean = DefaultInitialMean,
-                    double variance = DefaultInitialMean/3,
+                    double variance = (DefaultInitialMean / 3) * (DefaultInitialMean / 3),
                     double minRating = 1000.0,
                     double maxRating = 2600.0)
         {

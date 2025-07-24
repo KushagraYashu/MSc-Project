@@ -67,6 +67,11 @@ public class MainServer : MonoBehaviour
         VanillaTrueskillSystemManager.instance.SetupTrueskillSystem();
     }
 
+    public void InitialiseCustomTrueSkillSystem()
+    {
+        CustomTrueskillSystemManager.instance.SetupCustomTrueskillSystem();
+    }
+
     private HashSet<int> allIDs = new();
     private System.Random rng = new();
     public int GenerateRandomID(int maxAttempts, int maxIDs)

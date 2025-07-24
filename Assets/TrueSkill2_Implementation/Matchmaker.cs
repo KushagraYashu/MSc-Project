@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace TrueSkill2
@@ -17,47 +19,40 @@ namespace TrueSkill2
             this.minMatchQuality = minMatchQuality;
         }
 
-        public (List<Player> team1, List<Player> team2)? FindBestMatch(
+        public void FindBestMatch(
             List<Player> playerPool,
+            ref List<Player> team1,
+            ref List<Player> team2,
             int teamSize = 5,
             int maxAttempts = 1000)
         {
-            // 1. Filter players by availability, etc. (expand as needed)
+            //Filter players by availability, etc. (expand as needed)
             var availablePlayers = playerPool.Where(p => p.playerState == Player.PlayerState.Idle).ToList();
 
             if (availablePlayers.Count < teamSize * 2)
-                return null;
-
-            // 2. Sort by conservative rating for efficient searching
-            var sortedPlayers = availablePlayers
-                .OrderBy(p => p.playerData.MyTrueSkillRating.ConservativeRating)
-                .ToList();
-
-            // 3. Find best match using TrueSkill's quality metric
-            double bestQuality = minMatchQuality;
-            (List<Player>, List<Player>)? bestMatch = null;
+                return;
 
             for (int i = 0; i < maxAttempts; i++)
             {
                 // Random sampling works better than brute force for large pools
-                var candidates = RandomSample(sortedPlayers, teamSize * 2);
+                var candidates = RandomSample(availablePlayers, teamSize * 2);
                 var possibleTeams = GenerateTeamCombinations(candidates, teamSize);
 
-                foreach (var (team1, team2) in possibleTeams)
+                foreach (var (possibleTeam1, possibleTeam2) in possibleTeams)
                 {
-                    double quality = CalculateMatchQuality(team1, team2);
-                    if (quality > bestQuality)
+                    double quality = CalculateMatchQuality(possibleTeam1, possibleTeam2);
+                    CustomTrueskillSystemManager.instance.PrintSomething(quality.ToString());
+                    if (quality > minMatchQuality)
                     {
-                        bestQuality = quality;
-                        bestMatch = (team1, team2);
-
-                        // Early exit if we find an excellent match
-                        if (quality > 0.9) return bestMatch;
+                        team1 = possibleTeam1;
+                        team2 = possibleTeam2;
                     }
                 }
+
+                return;
             }
 
-            return bestMatch;
+            return;
         }
 
         // TrueSkill match quality calculation (0 = terrible, 1 = perfect)

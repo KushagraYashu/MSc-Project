@@ -20,9 +20,19 @@ public class Player
         TOTAL
     }
 
+    public enum PlayerPlayStyle
+    {
+        Basic,
+        Fragger,
+        Support,
+        Clutcher,
+        TOTAL,
+    }
+
     [Header("Player Settings")]
     public PlayerState playerState;
     public PlayerType playerType;
+    public List<PlayerPlayStyle> playerPlayStyles = new();
 
     [Header("Pool")]
     public List<int> poolHistory = new();
@@ -39,6 +49,11 @@ public class Player
     public List<double> sigmaHistory = new();
     public List<double> conservativeValHistory = new();
     public List<double> scaledRatingHistory = new();
+
+    [Header("Custom TrueSkill debug things")]
+    public List<double> scaledMuHistory = new();
+    public List<double> scaledSigmaHistory = new();
+    public List<double> scaledConservativeValHistory = new();
 
     //[Header("Visual Components")]
     //public GameObject playerMesh;

@@ -1316,7 +1316,7 @@ MonoBehaviour:
         m_CallState: 2
       - m_Target: {fileID: 671534688}
         m_TargetAssemblyTypeName: MainServer, Assembly-CSharp
-        m_MethodName: IntialiseGlickoSystem
+        m_MethodName: 
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1329,6 +1329,18 @@ MonoBehaviour:
       - m_Target: {fileID: 671534688}
         m_TargetAssemblyTypeName: MainServer, Assembly-CSharp
         m_MethodName: 
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 671534688}
+        m_TargetAssemblyTypeName: MainServer, Assembly-CSharp
+        m_MethodName: InitialiseCustomTrueSkillSystem
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1376,6 +1388,56 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 755046706}
   m_CullTransparentMesh: 1
+--- !u!1 &799168988
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 799168989}
+  - component: {fileID: 799168990}
+  m_Layer: 0
+  m_Name: CustomTrueskillSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &799168989
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799168988}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &799168990
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799168988}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7257d257a9a2910418d2ba3315724ac6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  totalMatches: 10
+  maxRoundsPerMatch: 3
+  teamSize: 5
+  matchQuality: 0.25
+  logTeams: 0
+  poolPlayersList: []
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1647,7 +1709,7 @@ MonoBehaviour:
         m_CallState: 2
       - m_Target: {fileID: 379790140}
         m_TargetAssemblyTypeName: GlickoSystemManager, Assembly-CSharp
-        m_MethodName: CreateAMatch
+        m_MethodName: 
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1660,6 +1722,18 @@ MonoBehaviour:
       - m_Target: {fileID: 312355057}
         m_TargetAssemblyTypeName: TrueskillSystemManager, Assembly-CSharp
         m_MethodName: 
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 799168990}
+        m_TargetAssemblyTypeName: CustomTrueskillSystemManager, Assembly-CSharp
+        m_MethodName: CreateAMatch
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -3082,3 +3156,4 @@ SceneRoots:
   - {fileID: 1006856609}
   - {fileID: 379790139}
   - {fileID: 312355056}
+  - {fileID: 799168989}
