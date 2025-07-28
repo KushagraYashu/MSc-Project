@@ -209,7 +209,14 @@ public class PlayerData
 
     public void UpdateAssistRatio()
     {
-        _assistRatio = _assists / (double)_roundsPlayed;
+        if(_roundsPlayed == 0)
+        {
+            _assistRatio = 0;
+        }
+        else
+        {
+            _assistRatio = _assists / (double)_roundsPlayed;
+        }
     }
 
     public void UpdateClutchRatio()
