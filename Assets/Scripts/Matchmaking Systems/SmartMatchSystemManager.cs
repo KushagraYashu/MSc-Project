@@ -1,9 +1,11 @@
 using System;
+using System.Buffers.Text;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using TMPro;
 using UnityEngine;
 
 public class SmartMatchSystemManager : MonoBehaviour
@@ -22,7 +24,8 @@ public class SmartMatchSystemManager : MonoBehaviour
     [Header("Match Properties")]
     public int maxRoundsPerMatch;
     public int teamSize = 5;
-    public float eloThreshold = 10f;
+    public float matchingThreshold = 10f;
+    public float losingStreakThreshold = 10f;
 
     //teams are now handled matchwise, that will make the matches be able to run simultaneously.
     //[Header("Teams")]
@@ -39,9 +42,11 @@ public class SmartMatchSystemManager : MonoBehaviour
         public List<Player> playersInPool;
 
         public int poolSize;
-        public void UpdatePoolSize()
+        public void UpdatePoolSize(int index)
         {
             poolSize = playersInPool.Count;
+
+            UIManager.instance.PoolPlayerCountTxtGOs[index].GetComponent<TMP_Text>().text = poolSize.ToString();
         }
 
         public PoolPlayers()
@@ -74,9 +79,10 @@ public class SmartMatchSystemManager : MonoBehaviour
 
     }
 
-    public void SetupSmartMatchSystem()
+    public void SetupSmartMatchSystem(int MPP)
     {
-        StartCoroutine(InitialiseSmartMatchSystem());
+        totalMatches = MPP;
+        StartCoroutine(InitialiseSmartMatchSystem(MPP));
     }
 
     //using Box-Muller transformation to generate normally distributed values
@@ -105,7 +111,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         return UnityEngine.Random.Range(top5PercentileMin, max);
     }
 
-    IEnumerator InitialiseSmartMatchSystem()
+    IEnumerator InitialiseSmartMatchSystem(int MPP)
     {
         var cp = CentralProperties.instance;
 
@@ -157,30 +163,33 @@ public class SmartMatchSystemManager : MonoBehaviour
                                     elo,
                                     realSkill,
                                     i,
-                                    eloThreshold,
+                                    matchingThreshold,
                                     Player.PlayerState.Idle,
                                     (i > 0) ? Player.PlayerType.Experienced : Player.PlayerType.Newbie);
 
                 if (i == 0)
                     newPlayer.playerPlayStyles.Add(Player.PlayerPlayStyle.Basic);
 
-                newPlayer.playerData.MatchesToPlay = totalMatches;
-                newPlayer.EloHistory.Add((float)newPlayer.playerData.Elo);
+                newPlayer.playerData.CalculateCompositeSkill();
+                newPlayer.playerData.MatchesToPlay = MPP;
+                newPlayer.EloHistory.Add((float)newPlayer.playerData.CompositeSkill);
                 newPlayer.poolHistory.Add(i);
 
                 poolPlayersList[i].playersInPool.Add(newPlayer);
 
                 if (j % 100 == 0)
                 {
-                    poolPlayersList[i].UpdatePoolSize();
+                    poolPlayersList[i].UpdatePoolSize(i);
                     yield return null; //yielding occasionally to keep Unity responsive
                 }
             }
 
-            poolPlayersList[i].UpdatePoolSize();
+            poolPlayersList[i].UpdatePoolSize(i);
         }
 
         yield return null;
+
+        CreateAMatch();
     }
 
     public void CreateAMatch()
@@ -287,7 +296,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,Elo,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,EloHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
+        csvContent.AppendLine("PlayerID,KDA,Kills,Clutches,Assists,CS,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
 
         string MSEListStr = string.Join(";", MSEs);
         string smurfListStr = string.Join(";", smurfPlayerIDs);
@@ -298,11 +307,11 @@ public class SmartMatchSystemManager : MonoBehaviour
             var player = allPlayers[i];
 
             // Serialise lists as semicolon-separated strings
-            string eloHistoryStr = string.Join(";", player.EloHistory);
+            string CSHistoryStr = string.Join(";", player.EloHistory);
             string poolHistoryStr = string.Join(";", player.poolHistory);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.Elo},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{eloHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.KDA},{player.playerData.Kills},{player.playerData.Clutches},{player.playerData.Assists},{player.playerData.CompositeSkill},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -465,6 +474,14 @@ public class SmartMatchSystemManager : MonoBehaviour
                     }
 
                     aliveTeam2.Remove(p2);
+
+                    if(UnityEngine.Random.Range(0f, 1f) < 0.5f) //50% chance of assist
+                    {
+                        //randomly select a player to award assist
+                        int i = UnityEngine.Random.Range(0, aliveTeam1.Count);
+                        var assistPlayer = aliveTeam1[i];
+                        assistPlayer.playerData.Assists++;
+                    }
                 }
                 else
                 {
@@ -478,6 +495,14 @@ public class SmartMatchSystemManager : MonoBehaviour
                     }
 
                     aliveTeam1.Remove(p1);
+
+                    if (UnityEngine.Random.Range(0f, 1f) < 0.5f) //50% chance of assist
+                    {
+                        //randomly select a player to award assist
+                        int i = UnityEngine.Random.Range(0, aliveTeam2.Count);
+                        var assistPlayer = aliveTeam2[i];
+                        assistPlayer.playerData.Assists++;
+                    }
                 }
 
                 p1.playerData.UpdateKDA();
@@ -534,34 +559,13 @@ public class SmartMatchSystemManager : MonoBehaviour
             winner = 2;
         }
 
-        float avgEloTeam1 = 0;
-        for (int i = 0; i < team1.Count; i++)
-        {
-            avgEloTeam1 += (float)team1[i].playerData.Elo;
-        }
-        avgEloTeam1 /= team1.Count;
-
-        float avgEloTeam2 = 0;
-        for (int i = 0; i < team2.Count; i++)
-        {
-            avgEloTeam2 += (float)team2[i].playerData.Elo;
-        }
-        avgEloTeam2 /= team2.Count;
-
-        double expectedResultTeam1 = 1.0 / (1.0 + Math.Pow(10, (avgEloTeam2 - avgEloTeam1) / 400.0));
-        double expectedResultTeam2 = 1.0 - expectedResultTeam1;
-
-        int maxPool = CentralProperties.instance.totPools - 1;
-        float maxK = 32f;
-        float minK = 8f;
-
         //Debug.Log("Updating Elo Ratings...");
         // Elo update for team 1
         foreach (var p in team1)
         {
             p.playerData.GamesPlayed++;
 
-            UpdateEloForPlayer(1, p, maxK, minK, maxPool, winner, expectedResultTeam1);
+            UpdateEloForPlayer(1, p, winner, team2);
 
             CheckRankDerank(p);
 
@@ -573,7 +577,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         {
             p.playerData.GamesPlayed++;
 
-            UpdateEloForPlayer(2, p, maxK, minK, maxPool, winner, expectedResultTeam2);
+            UpdateEloForPlayer(2, p, winner, team1);
 
             CheckRankDerank(p);
 
@@ -617,9 +621,9 @@ public class SmartMatchSystemManager : MonoBehaviour
         if (newPool != currentPool)
         {
             poolPlayersList[currentPool].playersInPool.Remove(p);
-            poolPlayersList[currentPool].UpdatePoolSize();
+            poolPlayersList[currentPool].UpdatePoolSize(currentPool);
             poolPlayersList[newPool].playersInPool.Add(p);
-            poolPlayersList[newPool].UpdatePoolSize();
+            poolPlayersList[newPool].UpdatePoolSize(newPool);
             if (newPool > 0)
             {
                 p.playerType = Player.PlayerType.Experienced;
@@ -632,10 +636,29 @@ public class SmartMatchSystemManager : MonoBehaviour
         }
     }
 
-    void UpdateEloForPlayer(int team, Player p, float maxK, float minK, int maxPool, int winner, double expectedScore)
+    void UpdateEloForPlayer(int team, Player p, int winner, List<Player> otherTeam)
     {
-        int poolIndex = p.playerData.Pool;
-        float K = Mathf.Lerp(maxK, minK, poolIndex / (float)maxPool);
+        double oldCS = p.playerData.CompositeSkill;
+
+        double expectedScore = 0.0f;
+        foreach(var pT2 in otherTeam)
+        {
+            expectedScore += 1.0 / (1.0 + Math.Pow(10, (pT2.playerData.Elo - p.playerData.Elo) / 400.0));
+        }
+        expectedScore /= otherTeam.Count;
+
+        int K;
+        //K value according to FIDE (Federation Internationale des Echecs or World Chess Federation)
+        if (p.playerData.GamesPlayed <= 30)
+            K = 40;
+        else
+        {
+            if (p.playerData.Elo < 2400f)
+                K = 20;
+            else
+                K = 10;
+        }
+
         double actualResult = winner == team ? 1.0 : 0.0;
 
         if (actualResult == 1.0) { 
@@ -647,13 +670,61 @@ public class SmartMatchSystemManager : MonoBehaviour
             p.playerData.Outcomes(0);
         }
 
-            double delta = K * (actualResult - expectedScore);
+        double delta = K * (actualResult - expectedScore);
+
+        double performance = CalculatePerformanceMultiplier(p, oldCS);
+
+        delta *= performance;
+
         p.playerData.Elo += delta;
 
-        p.EloHistory.Add((float)p.playerData.Elo);
-        p.totalChangeFromStart += (float)delta;
+        p.playerData.CalculateCompositeSkill();
+
+        p.EloHistory.Add((float)p.playerData.CompositeSkill);
+        p.totalChangeFromStart += (float)(p.playerData.CompositeSkill - oldCS);
 
         //Debug.Log($"Team {team}\nPlayer {p.playerData.Id} (Pool {poolIndex}) Elo updated: {p.playerData.Elo} (Delta: {delta})");
+    }
+
+    double CalculatePerformanceMultiplier(Player player, double oldCS)
+    {
+        double beforeMatchCS = oldCS;
+        player.playerData.CalculateCompositeSkill();
+        double afterMatchCS = player.playerData.CompositeSkill;
+
+        if (beforeMatchCS == 0) return 1.0;
+
+        double performanceRatio = afterMatchCS / beforeMatchCS;
+
+        if (performanceRatio > 2.0) return 2.5;
+        if (performanceRatio > 1.5) return 2.0;
+        if (performanceRatio > 1.2) return 1.5;
+        if (performanceRatio > 1.0) return 1.2;
+        return 1.0;
+    }
+
+    float CalcTeamElo(List<Player> team)
+    {
+        var sorted = team.OrderByDescending(p => p.playerData.Elo).ToList();
+
+        // Apply weights
+        // values are from
+        // Wu, R., Meng, X., Chen, H., Zhu, Z. and Wang, B., 2024. Achieving fairness in team - based FPS games: A skill-based matchmaking solution. Applied and Computational Engineering, 44, pp.208 - 223.
+        double weightedElo = 0.0;
+        weightedElo += sorted[0].playerData.CompositeSkill * 0.35; // Highest
+        weightedElo += sorted[4].playerData.CompositeSkill * 0.20; // Lowest
+
+        for (int i = 1; i <= 3; i++) // Middle three
+        {
+            weightedElo += sorted[i].playerData.CompositeSkill * 0.15;
+        }
+
+        return (float)weightedElo;
+    }
+
+    private List<Player> RandomSample(List<Player> list, int count)
+    {
+        return list.OrderBy(x => rng.Next()).Take(count).ToList();
     }
 
     public bool TrySplitFairTeamsAsync(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
@@ -661,15 +732,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         team1.Clear();
         team2.Clear();
 
-        // Filter idle players only
-        List<Player> idlePlayers = new();
-        for (int i = 0; i < pool.Count; i++)
-        {
-            if (pool[i].playerState == Player.PlayerState.Idle)
-            {
-                idlePlayers.Add(pool[i]);
-            }
-        }
+        List<Player> idlePlayers = pool.Where(p => p.playerState == Player.PlayerState.Idle).ToList();
 
         int totalRequired = teamSize * 2;
         if (idlePlayers.Count < totalRequired)
@@ -682,55 +745,42 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
-            HashSet<int> selectedIndices = new();
+            var selectedPlayers = RandomSample(idlePlayers, totalRequired);
+            var potentialTeam1 = selectedPlayers.Take(teamSize).ToList();
+            var potentialTeam2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
 
-            // Select 2 * teamSize unique indices randomly from the idlePlayers list
-            while (selectedIndices.Count < totalRequired)
+            // Check for losing streak players
+            bool t1HasLosingStreak = potentialTeam1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes()));
+            bool t2HasLosingStreak = potentialTeam2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes()));
+
+            float team1Elo = CalcTeamElo(potentialTeam1);
+            float team2Elo = CalcTeamElo(potentialTeam2);
+
+            if (t1HasLosingStreak && ((team1Elo - team2Elo) >= losingStreakThreshold))
             {
-                int randIndex = rng.Next(idlePlayers.Count);
-                selectedIndices.Add(randIndex);
-            }
-
-            // Convert to list for indexing
-            var selectedPlayers = selectedIndices.Select(i => idlePlayers[i]).ToList();
-
-            // Shuffle the selected players (small list, so fast)
-            for (int i = selectedPlayers.Count - 1; i > 0; i--)
-            {
-                int j = rng.Next(i + 1);
-                (selectedPlayers[i], selectedPlayers[j]) = (selectedPlayers[j], selectedPlayers[i]);
-            }
-
-            // Split into two teams
-            var t1 = selectedPlayers.Take(teamSize).ToList();
-            var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
-
-            float avgElo1 = t1.Average(p => (float)p.playerData.Elo);
-            float avgElo2 = t2.Average(p => (float)p.playerData.Elo);
-
-            if (Mathf.Abs(avgElo1 - avgElo2) <= eloThreshold)
-            {
-                team1 = t1;
-                team2 = t2;
-
+                team1 = potentialTeam1;
+                team2 = potentialTeam2;
                 UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-
-                if (logTeams)
-                {
-                    Debug.Log($"Fair match found! Elo diff: {Mathf.Abs(avgElo1 - avgElo2)}");
-                    Debug.Log("Team 1: Elo: " + avgElo1);
-                    Debug.Log("Team 2: Elo: " + avgElo2);
-                }
-
                 return true;
             }
-
-            //// Let Unity breathe
-            //if (attempt % 10 == 0)
-            //    await Task.Yield();
+            else if (t2HasLosingStreak && ((team2Elo - team1Elo) >= losingStreakThreshold))
+            {
+                team1 = potentialTeam1;
+                team2 = potentialTeam2;
+                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                return true;
+            }
+            else if (!t1HasLosingStreak && !t2HasLosingStreak &&
+                     Mathf.Abs(team1Elo - team2Elo) <= matchingThreshold)
+            {
+                team1 = potentialTeam1;
+                team2 = potentialTeam2;
+                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                return true;
+            }
         }
 
-        Debug.LogWarning("No fair team found after 10,000 random samples.");
+        Debug.LogWarning("No fair team found after many attempts.");
         return false;
     }
 

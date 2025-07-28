@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using TMPro;
 using UnityEngine;
 
 public class GlickoSystemManager : MonoBehaviour
@@ -39,9 +40,11 @@ public class GlickoSystemManager : MonoBehaviour
         public List<Player> playersInPool;
 
         public int poolSize;
-        public void UpdatePoolSize()
+        public void UpdatePoolSize(int index)
         {
             poolSize = playersInPool.Count;
+
+            UIManager.instance.PoolPlayerCountTxtGOs[index].GetComponent<TMP_Text>().text = poolSize.ToString();
         }
 
         public PoolPlayers()
@@ -73,9 +76,10 @@ public class GlickoSystemManager : MonoBehaviour
 
     }
 
-    public void SetupGlickoSystem()
+    public void SetupGlickoSystem(int MPP)
     {
-        StartCoroutine(InitialiseGlickoSystem());
+        totalMatches = MPP;
+        StartCoroutine(InitialiseGlickoSystem(MPP));
     }
 
     //using Box-Muller transformation to generate normally distributed values
@@ -104,7 +108,7 @@ public class GlickoSystemManager : MonoBehaviour
         return UnityEngine.Random.Range(top5PercentileMin, max);
     }
 
-    IEnumerator InitialiseGlickoSystem()
+    IEnumerator InitialiseGlickoSystem(int MPP)
     {
         var cp = CentralProperties.instance;
 
@@ -158,7 +162,7 @@ public class GlickoSystemManager : MonoBehaviour
                                     Player.PlayerState.Idle,
                                     (i > 0) ? Player.PlayerType.Experienced : Player.PlayerType.Newbie);
 
-                newPlayer.playerData.MatchesToPlay = totalMatches;
+                newPlayer.playerData.MatchesToPlay = MPP;
 
                 newPlayer.playerData.RD = 200f;
 
@@ -170,15 +174,17 @@ public class GlickoSystemManager : MonoBehaviour
 
                 if (j % 100 == 0)
                 {
-                    poolPlayersList[i].UpdatePoolSize();
+                    poolPlayersList[i].UpdatePoolSize(i);
                     yield return null; //yielding occasionally to keep Unity responsive
                 }
             }
 
-            poolPlayersList[i].UpdatePoolSize();
+            poolPlayersList[i].UpdatePoolSize(i);
         }
 
         yield return null;
+
+        CreateAMatch();
     }
 
     public void CreateAMatch()
@@ -620,9 +626,9 @@ public class GlickoSystemManager : MonoBehaviour
         if (newPool != currentPool)
         {
             poolPlayersList[currentPool].playersInPool.Remove(p);
-            poolPlayersList[currentPool].UpdatePoolSize();
+            poolPlayersList[currentPool].UpdatePoolSize(currentPool);
             poolPlayersList[newPool].playersInPool.Add(p);
-            poolPlayersList[newPool].UpdatePoolSize();
+            poolPlayersList[newPool].UpdatePoolSize(newPool);
             p.playerData.Pool = newPool;
 
             p.poolHistory.Add(newPool);

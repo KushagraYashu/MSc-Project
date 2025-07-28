@@ -35,7 +35,7 @@ public class PlayerData
     private double _Wk = 125.00;
     private double _Wa = 75.00;
     private double _Wc = 150.00;
-    private double _Wx = 10.00;
+    private double _Wx = 1.00;
 
     //kd ratio
     private uint _kills = 0;
@@ -119,6 +119,12 @@ public class PlayerData
     {
         get { return _kills; }
         set { _kills = value; }
+    }
+
+    public uint Assists
+    {
+        get { return _assists; }
+        set { _assists = value; }
     }
 
     public uint Deaths
@@ -220,6 +226,9 @@ public class PlayerData
 
     public void CalculateCompositeSkill()
     {
+        UpdateAssistRatio();
+        UpdateClutchRatio();
+
         _compositeSkill = 
             _We * _elo + 
             _Wk * _KDA + 
@@ -228,6 +237,7 @@ public class PlayerData
             _Wx * _gamesPlayed
         ;
     }
+
 
 
     public float TrueSkillScaled(float minGlobal, float maxGlobal)

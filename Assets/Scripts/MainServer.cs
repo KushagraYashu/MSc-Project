@@ -52,24 +52,66 @@ public class MainServer : MonoBehaviour
     {
     }
 
-    public void IntialiseEloSystem()
+    public void StartSimulation()
     {
-        EloSystemManager.instance.SetupEloSystem();
+        int systemIndex = UIManager.instance.SystemDropDown.GetComponent<TMP_Dropdown>().value;
+        int matchesPerPlayer = 0;
+        if (UIManager.instance.MPPInputField.GetComponent<TMP_InputField>().text == "")
+        {
+            matchesPerPlayer = 1;
+        }
+        else
+        {
+            matchesPerPlayer = int.Parse(UIManager.instance.MPPInputField.GetComponent<TMP_InputField>().text);
+        }
+        matchesPerPlayer = Mathf.Clamp(matchesPerPlayer, 1, 10000);
+
+        UIManager.instance.FirstScreen.SetActive(false);
+        UIManager.instance.SimulationScreen.SetActive(true);
+
+        switch (systemIndex)
+        {
+            case 0: // Elo System
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = "Elo System";
+                IntialiseEloSystem(matchesPerPlayer);
+                break;
+
+            case 1: // Glicko System
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = "Glicko System";
+                IntialiseGlickoSystem(matchesPerPlayer);
+                break;
+
+            case 2: // vanilla TrueSkill System (Moserware)
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = "Vanilla TrueSkill System (Moserware)";
+                InitialiseVanillaTrueSkillSystem(matchesPerPlayer);
+                break;
+
+            case 3: // SmartMatch System
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = "SmartMatch System";
+                InitialiseSmartMatchSystem(matchesPerPlayer);
+                break;
+
+        }
     }
 
-    public void IntialiseGlickoSystem()
+    public void IntialiseEloSystem(int MPP)
     {
-        GlickoSystemManager.instance.SetupGlickoSystem();
+        EloSystemManager.instance.SetupEloSystem(MPP);
     }
 
-    public void InitialiseVanillaTrueSkillSystem()
+    public void IntialiseGlickoSystem(int MPP)
     {
-        VanillaTrueskillSystemManager.instance.SetupTrueskillSystem();
+        GlickoSystemManager.instance.SetupGlickoSystem(MPP);
     }
 
-    public void InitialiseCustomTrueSkillSystem()
+    public void InitialiseVanillaTrueSkillSystem(int MPP)
     {
-        CustomTrueskillSystemManager.instance.SetupCustomTrueskillSystem();
+        VanillaTrueskillSystemManager.instance.SetupTrueskillSystem(MPP);
+    }
+
+    public void InitialiseSmartMatchSystem(int MPP)
+    {
+        SmartMatchSystemManager.instance.SetupSmartMatchSystem(MPP); ;
     }
 
     private HashSet<int> allIDs = new();

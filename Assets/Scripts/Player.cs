@@ -92,4 +92,23 @@ public class Player
             "\tElo: " + playerData.Elo);
         
     }
+
+    public bool IsOnLosingStreak(List<int> outcomes)
+    {
+        if (outcomes.Count < 3) return false;
+
+        int count = 0;
+        for (int i = outcomes.Count - 1; i >= 0; i--)
+        {
+            if (outcomes[i] == 0)
+            {
+                count++;
+                if (count >= 3)
+                    return true;
+            }
+            else break;
+        }
+
+        return false;
+    }
 }
