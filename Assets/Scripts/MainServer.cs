@@ -72,22 +72,22 @@ public class MainServer : MonoBehaviour
         switch (systemIndex)
         {
             case 0: // Elo System
-                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = "Elo System";
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Elo System (min matches:{matchesPerPlayer})";
                 IntialiseEloSystem(matchesPerPlayer);
                 break;
 
             case 1: // Glicko System
-                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = "Glicko System";
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Glicko System (min matches:{matchesPerPlayer})";
                 IntialiseGlickoSystem(matchesPerPlayer);
                 break;
 
             case 2: // vanilla TrueSkill System (Moserware)
-                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = "Vanilla TrueSkill System (Moserware)";
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Vanilla TrueSkill System (Moserware) (min matches:{matchesPerPlayer})";
                 InitialiseVanillaTrueSkillSystem(matchesPerPlayer);
                 break;
 
             case 3: // SmartMatch System
-                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = "SmartMatch System";
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"SmartMatch System (min matches:{matchesPerPlayer})";
                 InitialiseSmartMatchSystem(matchesPerPlayer);
                 break;
 

@@ -285,7 +285,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         }
 
         string time = System.DateTime.Now.ToString("dd-MM-yyyy_HH-mm-ss");
-        StartCoroutine(ExportPlayerDataToCSV(allPlayers, time + $"EloSystem-For-{totalMatches}Matches-PerPlayer-TotPlayerCount-{allPlayers.Count}"));
+        StartCoroutine(ExportPlayerDataToCSV(allPlayers, time + $"SmartMatchSystem-For-{totalMatches}Matches-PerPlayer-TotPlayerCount-{allPlayers.Count}"));
     }
 
     IEnumerator ExportPlayerDataToCSV(List<Player> allPlayers, string fileName)
@@ -296,7 +296,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,KDA,Kills,Clutches,Assists,CS,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
+        csvContent.AppendLine("PlayerID,KDA,Kills,Deaths,Clutches,Assists,CS,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
 
         string MSEListStr = string.Join(";", MSEs);
         string smurfListStr = string.Join(";", smurfPlayerIDs);
@@ -309,9 +309,10 @@ public class SmartMatchSystemManager : MonoBehaviour
             // Serialise lists as semicolon-separated strings
             string CSHistoryStr = string.Join(";", player.EloHistory);
             string poolHistoryStr = string.Join(";", player.poolHistory);
+            string outcomeHistoryStr = string.Join(";", player.playerData.Outcomes());
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.KDA},{player.playerData.Kills},{player.playerData.Clutches},{player.playerData.Assists},{player.playerData.CompositeSkill},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.KDA},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.Clutches},{player.playerData.Assists},{player.playerData.CompositeSkill},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -505,8 +506,8 @@ public class SmartMatchSystemManager : MonoBehaviour
                     }
                 }
 
-                p1.playerData.UpdateKDA();
-                p2.playerData.UpdateKDA();
+                p1.playerData.UpdateKDR();
+                p2.playerData.UpdateKDR();
 
                 yield return null;
             }
@@ -592,7 +593,7 @@ public class SmartMatchSystemManager : MonoBehaviour
     void CheckRankDerank(Player p)
     {
         int currentPool = p.playerData.Pool;
-        double elo = p.playerData.Elo;
+        double elo = p.playerData.CompositeSkill;
 
         int newPool = -1;
         var cp = CentralProperties.instance;
@@ -674,7 +675,14 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         double performance = CalculatePerformanceMultiplier(p, oldCS);
 
-        delta *= performance;
+        if(delta < 0)
+        {
+            delta /= performance; //less impact if player performed well
+        }
+        else
+        {
+            delta *= performance; //boost in case of good performance
+        }
 
         p.playerData.Elo += delta;
 

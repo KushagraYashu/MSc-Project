@@ -824,7 +824,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Pool/Rank 4
 
-    (2200 - 2600)'
+    (2200 - 2600+)'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1983,7 +1983,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Pool/Rank 1
 
-    (1000 - 1400)'
+    (<1000 - 1400)'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

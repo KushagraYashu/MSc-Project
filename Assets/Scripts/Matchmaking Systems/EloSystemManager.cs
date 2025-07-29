@@ -481,8 +481,8 @@ public class EloSystemManager : MonoBehaviour
                     aliveTeam1.Remove(p1);
                 }
 
-                p1.playerData.UpdateKDA();
-                p2.playerData.UpdateKDA();
+                p1.playerData.UpdateKDR();
+                p2.playerData.UpdateKDR();
 
                 yield return null;
             }

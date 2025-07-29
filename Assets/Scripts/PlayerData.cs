@@ -32,15 +32,15 @@ public class PlayerData
     //composite skill
     [SerializeField] private double _compositeSkill = 0;
     private double _We = 1.00;
-    private double _Wk = 125.00;
-    private double _Wa = 75.00;
-    private double _Wc = 150.00;
+    private double _Wk = 12.500;
+    private double _Wa = 7.500;
+    private double _Wc = 15.000;
     private double _Wx = 1.00;
 
     //kd ratio
     private uint _kills = 0;
     private uint _deaths = 0;
-    [SerializeField] private double _KDA = 0;
+    [SerializeField] private double _KDR = 0;
 
     //assists and clutch ratios
     private uint _assists = 0;
@@ -135,7 +135,7 @@ public class PlayerData
 
     public double KDA
     {
-        get { return _KDA; }
+        get { return _KDR; }
     }
 
     public uint Clutches
@@ -195,15 +195,15 @@ public class PlayerData
         _outcomes.Add(value);
     }
 
-    public void UpdateKDA()
+    public void UpdateKDR()
     {
         if (_deaths == 0)
         {
-            _KDA = _kills + _assists;
+            _KDR = _kills;
         }
         else
         {
-            _KDA = (_kills + _assists) / (double)_deaths;
+            _KDR = (_kills) / (double)_deaths;
         }
     }
 
@@ -238,7 +238,7 @@ public class PlayerData
 
         _compositeSkill = 
             _We * _elo + 
-            _Wk * _KDA + 
+            _Wk * _KDR + 
             _Wa * _assistRatio + 
             _Wc * _clutchRatio + 
             _Wx * _gamesPlayed
