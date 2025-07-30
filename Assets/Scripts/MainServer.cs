@@ -40,6 +40,20 @@ public class MainServer : MonoBehaviour
     public TMP_InputField totPlayerCount_IF;
     public TMP_InputField expPlayerCount_IF;
 
+    [Header("Simulation Variables")]
+    [SerializeField] private int _systemIndex;
+    [SerializeField] private int _matchesPerPlayer;
+
+    public int SystemIndex
+    {
+        get { return _systemIndex; }
+    }
+
+    public int MatchesPerPlayer
+    {
+        get { return _matchesPerPlayer; }
+    }
+
     //internal variables
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -54,41 +68,40 @@ public class MainServer : MonoBehaviour
 
     public void StartSimulation()
     {
-        int systemIndex = UIManager.instance.SystemDropDown.GetComponent<TMP_Dropdown>().value;
-        int matchesPerPlayer = 0;
+        _systemIndex = UIManager.instance.SystemDropDown.GetComponent<TMP_Dropdown>().value;
         if (UIManager.instance.MPPInputField.GetComponent<TMP_InputField>().text == "")
         {
-            matchesPerPlayer = 1;
+            _matchesPerPlayer = 1;
         }
         else
         {
-            matchesPerPlayer = int.Parse(UIManager.instance.MPPInputField.GetComponent<TMP_InputField>().text);
+            _matchesPerPlayer = int.Parse(UIManager.instance.MPPInputField.GetComponent<TMP_InputField>().text);
         }
-        matchesPerPlayer = Mathf.Clamp(matchesPerPlayer, 1, 10000);
+        _matchesPerPlayer = Mathf.Clamp(_matchesPerPlayer, 1, 10000);
 
         UIManager.instance.FirstScreen.SetActive(false);
         UIManager.instance.SimulationScreen.SetActive(true);
 
-        switch (systemIndex)
+        switch (_systemIndex)
         {
             case 0: // Elo System
-                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Elo System (min matches:{matchesPerPlayer})";
-                IntialiseEloSystem(matchesPerPlayer);
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Elo System (min matches:{_matchesPerPlayer})";
+                IntialiseEloSystem(_matchesPerPlayer);
                 break;
 
             case 1: // Glicko System
-                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Glicko System (min matches:{matchesPerPlayer})";
-                IntialiseGlickoSystem(matchesPerPlayer);
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Glicko System (min matches:{_matchesPerPlayer})";
+                IntialiseGlickoSystem(_matchesPerPlayer);
                 break;
 
             case 2: // vanilla TrueSkill System (Moserware)
-                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Vanilla TrueSkill System (Moserware) (min matches:{matchesPerPlayer})";
-                InitialiseVanillaTrueSkillSystem(matchesPerPlayer);
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"Vanilla TrueSkill System (Moserware) (min matches:{_matchesPerPlayer})";
+                InitialiseVanillaTrueSkillSystem(_matchesPerPlayer);
                 break;
 
             case 3: // SmartMatch System
-                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"SmartMatch System (min matches:{matchesPerPlayer})";
-                InitialiseSmartMatchSystem(matchesPerPlayer);
+                UIManager.instance.SysNameTxt.GetComponent<TMP_Text>().text = $"SmartMatch System (min matches:{_matchesPerPlayer})";
+                InitialiseSmartMatchSystem(_matchesPerPlayer);
                 break;
 
         }
