@@ -631,8 +631,13 @@ public class GlickoSystemManager : MonoBehaviour
             poolPlayersList[currentPool].UpdatePoolSize(currentPool);
             poolPlayersList[newPool].playersInPool.Add(p);
             poolPlayersList[newPool].UpdatePoolSize(newPool);
-            p.playerData.Pool = newPool;
 
+            if (newPool > 0 && p.playerType != Player.PlayerType.Smurf)
+            {
+                p.playerType = Player.PlayerType.Experienced;
+            }
+
+            p.playerData.Pool = newPool;
             p.poolHistory.Add(newPool);
 
             Debug.Log($"Player {p.playerData.Id} moved from Pool {currentPool} to Pool {newPool} (Elo: {elo} Real Skill: {p.playerData.RealSkill})");

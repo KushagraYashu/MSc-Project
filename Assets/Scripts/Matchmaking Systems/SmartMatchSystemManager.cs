@@ -625,10 +625,12 @@ public class SmartMatchSystemManager : MonoBehaviour
             poolPlayersList[currentPool].UpdatePoolSize(currentPool);
             poolPlayersList[newPool].playersInPool.Add(p);
             poolPlayersList[newPool].UpdatePoolSize(newPool);
-            if (newPool > 0)
+
+            if (newPool > 0 && p.playerType != Player.PlayerType.Smurf)
             {
                 p.playerType = Player.PlayerType.Experienced;
             }
+
             p.playerData.Pool = newPool;
 
             p.poolHistory.Add(newPool);
