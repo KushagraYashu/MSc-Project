@@ -693,7 +693,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         p.EloHistory.Add((float)p.playerData.CompositeSkill);
         p.totalChangeFromStart += (float)(p.playerData.CompositeSkill - oldCS);
 
-        p.representationDirty = true;
+        UIManager.instance.UpdateBoxContent(p);
 
 
         //Debug.Log($"Team {team}\nPlayer {p.playerData.Id} (Pool {poolIndex}) Elo updated: {p.playerData.Elo} (Delta: {delta})");

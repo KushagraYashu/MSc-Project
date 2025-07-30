@@ -687,8 +687,7 @@ public class GlickoSystemManager : MonoBehaviour
         p.EloHistory.Add((float)newRating);
         p.totalChangeFromStart += (float)delta;
 
-        p.representationDirty = true;
-
+        UIManager.instance.UpdateBoxContent(p);
 
         //Debug.Log($"Team {team} - Player {p.playerData.Id} Elo: {newRating:F2} (Delta: {delta:F2}), New RD: {newRD:F2}");
     }

@@ -662,7 +662,7 @@ public class EloSystemManager : MonoBehaviour
         p.EloHistory.Add((float)p.playerData.Elo);
         p.totalChangeFromStart += (float)delta;
 
-        p.representationDirty = true;
+        UIManager.instance.UpdateBoxContent(p);
 
         //Debug.Log($"Team {team}\nPlayer {p.playerData.Id} (Pool {poolIndex}) Elo updated: {p.playerData.Elo} (Delta: {delta})");
     }

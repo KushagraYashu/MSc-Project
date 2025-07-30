@@ -39,6 +39,11 @@ public class PlayerDetailsPanel : MonoBehaviour
         gamesText.text = $"{p.playerData.GamesPlayed} Games";
 
         var outcomes = p.playerData.Outcomes;
+        foreach(var text in historyTexts)
+        {
+            text.text = ""; // Clear previous texts
+            text.color = Color.white; // Reset color
+        }
         for (int i = outcomes.Count - 1, j = 0; j < historyTexts.Length; i--, j++)
         {
             if (i < 0) break; // Prevent index out of range

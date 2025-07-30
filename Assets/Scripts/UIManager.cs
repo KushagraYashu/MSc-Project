@@ -292,6 +292,17 @@ public class UIManager : MonoBehaviour
         _currentActiveDetailsPanel.gameObject.SetActive(true);
     }
 
+    public void UpdateBoxContent(Player p)
+    {
+        foreach(var box in allShowBoxes)
+        {
+            if(p == box.associatedPlayer && box.gameObject.activeInHierarchy)
+            {
+                box.UpdateDetails();
+            }
+        }
+    }
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {

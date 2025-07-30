@@ -640,7 +640,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             p.conservativeValHistory.Add(p.playerData.TrueSkillRating.ConservativeRating);
             p.scaledRatingHistory.Add(p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal));
 
-            p.representationDirty = true;
+            UIManager.instance.UpdateBoxContent(p);
 
         }
 
@@ -653,7 +653,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             p.conservativeValHistory.Add(p.playerData.TrueSkillRating.ConservativeRating);
             p.scaledRatingHistory.Add(p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal));
 
-            p.representationDirty = true;
+            UIManager.instance.UpdateBoxContent(p);
 
         }
 
