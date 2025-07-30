@@ -150,6 +150,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                 if (i == 0 && smurfCount < CentralProperties.instance.totSmurfs)  //putting smurfs in the first pool
                 {
                     realSkill = GetTop5PercentileElo(minEloGlobal, maxEloGlobal);
+                    newPlayer.playerType = Player.PlayerType.Smurf;
                     newPlayer.playerPlayStyles.Add(Player.PlayerPlayStyle.Fragger);
                     smurfPlayerIDs.Add(ID);
                     smurfCount++;
@@ -164,8 +165,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                                     realSkill,
                                     i,
                                     matchingThreshold,
-                                    Player.PlayerState.Idle,
-                                    (i > 0) ? Player.PlayerType.Experienced : Player.PlayerType.Newbie);
+                                    Player.PlayerState.Idle);
 
                 if (i == 0)
                     newPlayer.playerPlayStyles.Add(Player.PlayerPlayStyle.Basic);
@@ -675,7 +675,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         double performance = CalculatePerformanceMultiplier(p, oldCS);
 
-        if(delta < 0)
+        if(delta <= 0)
         {
             delta /= performance; //less impact if player performed well
         }

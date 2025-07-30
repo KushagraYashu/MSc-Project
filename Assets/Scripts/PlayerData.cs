@@ -32,10 +32,10 @@ public class PlayerData
     //composite skill
     [SerializeField] private double _compositeSkill = 0;
     private double _We = 1.00;
-    private double _Wk = 12.500;
-    private double _Wa = 7.500;
-    private double _Wc = 15.000;
-    private double _Wx = 1.00;
+    private double _Wk = 20.500;
+    private double _Wa = 10.500;
+    private double _Wc = 17.000;
+    private double _Wx = 2.00;
 
     //kd ratio
     private uint _kills = 0;

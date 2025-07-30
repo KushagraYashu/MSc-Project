@@ -138,6 +138,8 @@ public class GlickoSystemManager : MonoBehaviour
 
             for (int j = 0; j < poolPlayers[i]; j++)
             {
+                Player newPlayer = new();
+
                 float elo = minElo;
                 float realSkill = 0;
                 int ID = MainServer.instance.GenerateRandomID(maxAttempts, maxIDs);
@@ -145,6 +147,7 @@ public class GlickoSystemManager : MonoBehaviour
                 if (i == 0 && smurfCount < CentralProperties.instance.totSmurfs)  //putting smurfs in the first pool
                 {
                     realSkill = GetTop5PercentileElo(minEloGlobal, maxEloGlobal);
+                    newPlayer.playerType = Player.PlayerType.Smurf;
                     smurfPlayerIDs.Add(ID);
                     smurfCount++;
                 }
@@ -153,14 +156,13 @@ public class GlickoSystemManager : MonoBehaviour
                     realSkill = GenerateNormallyDistributedRealSkill(minEloGlobal, maxEloGlobal);
                 }
 
-                Player newPlayer = new();
                 newPlayer.SetPlayer(ID,
                                     elo,
                                     realSkill,
                                     i,
                                     eloThreshold,
-                                    Player.PlayerState.Idle,
-                                    (i > 0) ? Player.PlayerType.Experienced : Player.PlayerType.Newbie);
+                                    Player.PlayerState.Idle
+                                    );
 
                 newPlayer.playerData.MatchesToPlay = MPP;
 

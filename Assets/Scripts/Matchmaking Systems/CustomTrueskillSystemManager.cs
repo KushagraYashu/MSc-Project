@@ -172,8 +172,8 @@ public class CustomTrueskillSystemManager : MonoBehaviour
                                     realSkill,
                                     i,
                                     50,
-                                    Player.PlayerState.Idle,
-                                    (i > 0) ? Player.PlayerType.Experienced : Player.PlayerType.Newbie);
+                                    Player.PlayerState.Idle
+                                    );
 
                 newPlayer.playerData.MatchesToPlay = totalMatches;
 

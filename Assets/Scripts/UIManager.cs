@@ -70,7 +70,27 @@ public class UIManager : MonoBehaviour
     {
         _playerShowScreen.SetActive(true);
 
-        var pool = EloSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+        List<Player> pool = new();
+
+        switch (MainServer.instance.SystemIndex)
+        {
+            case 0: //Elo
+                pool = EloSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+                break;
+
+            case 1: //glicko
+                pool = GlickoSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+                break;
+
+            case 2: //vanilla trueskill (moserware)
+                pool = VanillaTrueskillSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+                break;
+
+            case 3: //smart match
+                pool = SmartMatchSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+                break;
+        }
+
         snapshot = new List<Player>(pool.Where(p => p != null));
 
         snapshot = snapshot.OrderBy(p => p.playerData.Id).ToList();
@@ -88,9 +108,33 @@ public class UIManager : MonoBehaviour
         {
             var p = snapshot[i];
             allShowBoxes[i].associatedPlayer = p;
+
+            if (p.playerType == Player.PlayerType.Smurf)
+                allShowBoxes[i].bgImage.color = new Color(1f, 1f, 0f, allShowBoxes[i].bgImage.color.a);
+            else
+                allShowBoxes[i].bgImage.color = new Color(1f, 1f, 1f, allShowBoxes[i].bgImage.color.a);
+
             allShowBoxes[i].gameObject.SetActive(true);
             allShowBoxes[i].IDTxtGO.GetComponent<TMPro.TMP_Text>().text = $"Player ID: {p.playerData.Id}";
-            allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+
+            switch (MainServer.instance.SystemIndex)
+            {
+                case 0: //elo
+                    allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+                    break;
+
+                case 1: //glicko
+                    allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+                    break;
+
+                case 2: //vanilla trueskill (moserware)
+                    allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F4");
+                    break;
+
+                case 3: //smart match
+                    allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.CompositeSkill.ToString("F4");
+                    break;
+            }
         }
 
         curPage = 1;
@@ -104,7 +148,26 @@ public class UIManager : MonoBehaviour
             {
                 if(box.associatedPlayer != null)
                 {
-                    box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = box.associatedPlayer.playerData.Elo.ToString("F4");
+                    Player p = box.associatedPlayer;
+
+                    switch (MainServer.instance.SystemIndex)
+                    {
+                        case 0: //elo
+                            box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+                            break;
+
+                        case 1: //glicko
+                            box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+                            break;
+
+                        case 2: //vanilla trueskill (moserware)
+                            box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F4");
+                            break;
+
+                        case 3: //smart match
+                            box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.CompositeSkill.ToString("F4");
+                            break;
+                    }
                 }
             }
         }
@@ -131,9 +194,33 @@ public class UIManager : MonoBehaviour
             {
                 var p = thisPagePlayers[i];
                 allShowBoxes[i].associatedPlayer = p;
+
+                if (p.playerType == Player.PlayerType.Smurf)
+                    allShowBoxes[i].bgImage.color = new Color(1f, 1f, 0f, allShowBoxes[i].bgImage.color.a);
+                else
+                    allShowBoxes[i].bgImage.color = new Color(1f, 1f, 1f, allShowBoxes[i].bgImage.color.a);
+
                 allShowBoxes[i].gameObject.SetActive(true);
                 allShowBoxes[i].IDTxtGO.GetComponent<TMPro.TMP_Text>().text = $"Player ID: {p.playerData.Id}";
-                allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+
+                switch (MainServer.instance.SystemIndex)
+                {
+                    case 0: //elo
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+                        break;
+
+                    case 1: //glicko
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+                        break;
+
+                    case 2: //vanilla trueskill (moserware)
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F4");
+                        break;
+
+                    case 3: //smart match
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.CompositeSkill.ToString("F4");
+                        break;
+                }
             }
 
             curPage++;
@@ -144,6 +231,8 @@ public class UIManager : MonoBehaviour
     {
         if(curPage > 1)
         {
+            curPage = Mathf.Max(0, curPage - 2);
+
             int skip = curPage * allShowBoxes.Count;
 
             var thisPagePlayers = snapshot.Skip(skip).Take(allShowBoxes.Count).ToList();
@@ -161,15 +250,40 @@ public class UIManager : MonoBehaviour
             {
                 var p = thisPagePlayers[i];
                 allShowBoxes[i].associatedPlayer = p;
+
+                if (p.playerType == Player.PlayerType.Smurf)
+                    allShowBoxes[i].bgImage.color = new Color(1f, 1f, 0f, allShowBoxes[i].bgImage.color.a);
+                else
+                    allShowBoxes[i].bgImage.color = new Color(1f, 1f, 1f, allShowBoxes[i].bgImage.color.a);
+
                 allShowBoxes[i].gameObject.SetActive(true);
                 allShowBoxes[i].IDTxtGO.GetComponent<TMPro.TMP_Text>().text = $"Player ID: {p.playerData.Id}";
-                allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+
+                switch (MainServer.instance.SystemIndex)
+                {
+                    case 0: //elo
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+                        break;
+
+                    case 1: //glicko
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
+                        break;
+
+                    case 2: //vanilla trueskill (moserware)
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F4");
+                        break;
+
+                    case 3: //smart match
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.CompositeSkill.ToString("F4");
+                        break;
+                }
             }
 
             curPage++;
         }
     }
 
+    PlayerDetailsPanel _currentActiveDetailsPanel = null;
     public void Print()
     {
         Debug.Log("Hello");

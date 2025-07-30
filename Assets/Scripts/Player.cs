@@ -14,7 +14,7 @@ public class Player
 
     public enum PlayerType
     {
-        Bot,
+        Smurf,
         Experienced,
         Newbie,
         TOTAL
@@ -31,7 +31,7 @@ public class Player
 
     [Header("Player Settings")]
     public PlayerState playerState;
-    public PlayerType playerType;
+    public PlayerType playerType = PlayerType.TOTAL;
     public List<PlayerPlayStyle> playerPlayStyles = new();
 
     [Header("Pool")]
@@ -71,14 +71,20 @@ public class Player
     public PlayerData playerData;
 
     //Constructor
-    public void SetPlayer(int id, double baseElo, double realSkill,int pool, double matchingThreshold, PlayerState state, PlayerType type)
+    public void SetPlayer(int id, double baseElo, double realSkill,int pool, double matchingThreshold, PlayerState state)
     {
         playerState = state;
-        playerType = type;
+        if (playerType == PlayerType.TOTAL)
+        {
+            if (pool > 0)
+                playerType = PlayerType.Experienced;
+            else
+                playerType = PlayerType.Newbie;
+        }
         //playerMesh.GetComponent<MeshRenderer>().material = playerMaterialsBasedOnState[(int)state];
 
         //initialising player data
-        if (playerData == null) playerData = new();
+        playerData ??= new();
         playerData.SetPlayerData(id, baseElo, realSkill, pool, matchingThreshold);
 
         //UpdateCanvas();
