@@ -276,7 +276,12 @@ public class UIManager : MonoBehaviour
         if (_currentActiveDetailsPanel != null)
         {
             _currentActiveDetailsPanel.gameObject.SetActive(false);
-            _currentActiveDetailsPanel = null;
+
+            if(_currentActiveDetailsPanel == showBox.GetComponent<PlayerShowBox>().detailsPanel)
+            {
+                _currentActiveDetailsPanel = null;
+                return;
+            }
         }
 
         var ShowBox = showBox.GetComponent<PlayerShowBox>();
