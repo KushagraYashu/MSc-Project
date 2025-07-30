@@ -33,7 +33,8 @@ public class UIManager : MonoBehaviour
     //internal variables
     int showPlayerIndex = 0;
     List<PlayerShowBox> allShowBoxes = new();
-    
+    PlayerDetailsPanel _currentActiveDetailsPanel = null;
+
     public GameObject FirstScreen
     {
         get { return _firstScreenGO; }
@@ -68,6 +69,11 @@ public class UIManager : MonoBehaviour
     int curPage = 0;
     public void ShowPool(int poolIndex)
     {
+        if(_currentActiveDetailsPanel != null)
+        {
+            _currentActiveDetailsPanel.gameObject.SetActive(false);
+            _currentActiveDetailsPanel = null;
+        }
         _playerShowScreen.SetActive(true);
 
         List<Player> pool = new();
@@ -140,41 +146,16 @@ public class UIManager : MonoBehaviour
         curPage = 1;
     }
 
-    public void LateUpdate()
-    {
-        foreach(PlayerShowBox box in allShowBoxes)
-        {
-            if (box.gameObject.activeInHierarchy)
-            {
-                if(box.associatedPlayer != null)
-                {
-                    Player p = box.associatedPlayer;
-
-                    switch (MainServer.instance.SystemIndex)
-                    {
-                        case 0: //elo
-                            box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
-                            break;
-
-                        case 1: //glicko
-                            box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.Elo.ToString("F4");
-                            break;
-
-                        case 2: //vanilla trueskill (moserware)
-                            box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F4");
-                            break;
-
-                        case 3: //smart match
-                            box.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.CompositeSkill.ToString("F4");
-                            break;
-                    }
-                }
-            }
-        }
-    }
+    
 
     public void NextPage()
     {
+        if (_currentActiveDetailsPanel != null)
+        {
+            _currentActiveDetailsPanel.gameObject.SetActive(false);
+            _currentActiveDetailsPanel = null;
+        }
+
         int skip = curPage * allShowBoxes.Count;
 
         var thisPagePlayers = snapshot.Skip(skip).Take(allShowBoxes.Count).ToList();
@@ -229,7 +210,13 @@ public class UIManager : MonoBehaviour
 
     public void PrevPage()
     {
-        if(curPage > 1)
+        if (_currentActiveDetailsPanel != null)
+        {
+            _currentActiveDetailsPanel.gameObject.SetActive(false);
+            _currentActiveDetailsPanel = null;
+        }
+
+        if (curPage > 1)
         {
             curPage = Mathf.Max(0, curPage - 2);
 
@@ -283,10 +270,21 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    PlayerDetailsPanel _currentActiveDetailsPanel = null;
-    public void Print()
+    
+    public void ShowPlayerDetails(GameObject showBox)
     {
-        Debug.Log("Hello");
+        if (_currentActiveDetailsPanel != null)
+        {
+            _currentActiveDetailsPanel.gameObject.SetActive(false);
+            _currentActiveDetailsPanel = null;
+        }
+
+        var ShowBox = showBox.GetComponent<PlayerShowBox>();
+        _currentActiveDetailsPanel = ShowBox.detailsPanel;
+
+        _currentActiveDetailsPanel.GetComponent<PlayerDetailsPanel>().ShowDetails(ShowBox.associatedPlayer);
+
+        _currentActiveDetailsPanel.gameObject.SetActive(true);
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created

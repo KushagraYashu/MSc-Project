@@ -309,10 +309,10 @@ public class SmartMatchSystemManager : MonoBehaviour
             // Serialise lists as semicolon-separated strings
             string CSHistoryStr = string.Join(";", player.EloHistory);
             string poolHistoryStr = string.Join(";", player.poolHistory);
-            string outcomeHistoryStr = string.Join(";", player.playerData.Outcomes());
+            string outcomeHistoryStr = string.Join(";", player.playerData.Outcomes);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.KDA},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.Clutches},{player.playerData.Assists},{player.playerData.CompositeSkill},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.KDR},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.Clutches},{player.playerData.Assists},{player.playerData.CompositeSkill},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -664,11 +664,11 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         if (actualResult == 1.0) { 
             p.playerData.Wins++;
-            p.playerData.Outcomes(1);
+            p.playerData.Outcomes.Add(1);
         }
         else
         {
-            p.playerData.Outcomes(0);
+            p.playerData.Outcomes.Add(0);
         }
 
         double delta = K * (actualResult - expectedScore);
@@ -690,6 +690,9 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         p.EloHistory.Add((float)p.playerData.CompositeSkill);
         p.totalChangeFromStart += (float)(p.playerData.CompositeSkill - oldCS);
+
+        p.representationDirty = true;
+
 
         //Debug.Log($"Team {team}\nPlayer {p.playerData.Id} (Pool {poolIndex}) Elo updated: {p.playerData.Elo} (Delta: {delta})");
     }
@@ -758,8 +761,8 @@ public class SmartMatchSystemManager : MonoBehaviour
             var potentialTeam2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
 
             // Check for losing streak players
-            bool t1HasLosingStreak = potentialTeam1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes()));
-            bool t2HasLosingStreak = potentialTeam2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes()));
+            bool t1HasLosingStreak = potentialTeam1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+            bool t2HasLosingStreak = potentialTeam2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
 
             float team1Elo = CalcTeamElo(potentialTeam1);
             float team2Elo = CalcTeamElo(potentialTeam2);

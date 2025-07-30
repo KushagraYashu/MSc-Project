@@ -12,6 +12,9 @@ public class GraphMaker : MonoBehaviour
     [Header("Target UI")]
     public RawImage graphImage;
 
+    //internal variables
+    List<GameObject> allGraphElements = new();
+
     private void Start()
     {
         
@@ -29,30 +32,179 @@ public class GraphMaker : MonoBehaviour
         circleRectTransform.anchorMin = new Vector2(0f, 0f);
         circleRectTransform.anchorMax = new Vector2(0f, 0f);
 
+        allGraphElements.Add(circle);
+
         return circle;
     }
 
-    void ShowGraph(List<double> values)
+    public void ShowGraph(List<float> values)
     {
-        float padLeft = 35f;
-        float padBottom = 30f;
+        ClearGraph();
 
-        float graphHeight = graphImage.rectTransform.sizeDelta.y - padBottom;
-        float xSize = 20f;
-        float yMax = (float)values.Max() + (float)values.Max() * 0.2f;
+        float padLeft = 35f;
+        float padRight = 10f;
+        float padBottom = 30f;
+        float padTop = 10f;
+
+        // Get drawable area from the RectTransform actually used for plotting
+        RectTransform rt = graphImage.rectTransform;
+        float contentWidth = rt.rect.width - padLeft - padRight;
+        float contentHeight = rt.rect.height - padTop - padBottom;
+
+        // Data
+        int n = values.Count; // prefer .Count over .Count()
+        if (n == 0) return; // or return;
+
+        // Y range with 20% headroom
+        double minYd = values.Min();
+        double maxYd = values.Max();
+        double range = Mathf.Max(1e-6f, (float)maxYd - (float)minYd); // prevent div by zero
+        double margin = 0.2 * range;
+
+        float yMin = (float)(minYd - margin);
+        float yMax = (float)(maxYd + margin);
+        float yRange = yMax - yMin;
+
+        // Clear previous points/lines if needed
 
         GameObject lastDot = null;
-        for(int i =0; i < values.Count; i++)
-        {
-            float xPos = padLeft + (i * xSize);
-            float yPos = (((float)values[i] / yMax) * graphHeight) + padBottom;
 
-            GameObject createdDot = CreateCircle(new Vector2(xPos, yPos));
+        // If only 1 point, place it in the middle on X for aesthetics
+        float denom = Mathf.Max(1, n - 1);
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (n == 1) ? 0.5f : (float)i / denom; // 0..1 across the width
+            float xPos = padLeft + t * contentWidth;
+
+            float v = (float)values[i];
+            float yNorm = Mathf.InverseLerp(yMin, yMax, v); // (v - yMin)/yRange
+            float yPos = padBottom + yNorm * contentHeight;
+
+            GameObject dot = CreateCircle(new Vector2(xPos, yPos));
+
             if (lastDot != null)
             {
-                CreateLine(lastDot.GetComponent<RectTransform>().anchoredPosition, createdDot.GetComponent<RectTransform>().anchoredPosition);
+                CreateLine(
+                    lastDot.GetComponent<RectTransform>().anchoredPosition,
+                    dot.GetComponent<RectTransform>().anchoredPosition
+                );
             }
-            lastDot = createdDot;
+            lastDot = dot;
+        }
+    }
+
+    public void ShowGraph(List<double> values)
+    {
+        ClearGraph();
+
+        float padLeft = 35f;
+        float padRight = 10f;
+        float padBottom = 30f;
+        float padTop = 10f;
+
+        // Get drawable area from the RectTransform actually used for plotting
+        RectTransform rt = graphImage.rectTransform;
+        float contentWidth = rt.rect.width - padLeft - padRight;
+        float contentHeight = rt.rect.height - padTop - padBottom;
+
+        // Data
+        int n = values.Count; // prefer .Count over .Count()
+        if (n == 0) return; // or return;
+
+        // Y range with 20% headroom
+        double minYd = values.Min();
+        double maxYd = values.Max();
+        double range = Mathf.Max(1e-6f, (float)maxYd - (float)minYd); // prevent div by zero
+        double margin = 0.2 * range;
+
+        float yMin = (float)(minYd - margin);
+        float yMax = (float)(maxYd + margin);
+        float yRange = yMax - yMin;
+
+        // Clear previous points/lines if needed
+
+        GameObject lastDot = null;
+
+        // If only 1 point, place it in the middle on X for aesthetics
+        float denom = Mathf.Max(1, n - 1);
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (n == 1) ? 0.5f : (float)i / denom; // 0..1 across the width
+            float xPos = padLeft + t * contentWidth;
+
+            float v = (float)values[i];
+            float yNorm = Mathf.InverseLerp(yMin, yMax, v); // (v - yMin)/yRange
+            float yPos = padBottom + yNorm * contentHeight;
+
+            GameObject dot = CreateCircle(new Vector2(xPos, yPos));
+
+            if (lastDot != null)
+            {
+                CreateLine(
+                    lastDot.GetComponent<RectTransform>().anchoredPosition,
+                    dot.GetComponent<RectTransform>().anchoredPosition
+                );
+            }
+            lastDot = dot;
+        }
+    }
+
+    public void ShowGraph(List<int> values)
+    {
+        ClearGraph();
+
+        float padLeft = 35f;
+        float padRight = 10f;
+        float padBottom = 30f;
+        float padTop = 10f;
+
+        // Get drawable area from the RectTransform actually used for plotting
+        RectTransform rt = graphImage.rectTransform;
+        float contentWidth = rt.rect.width - padLeft - padRight;
+        float contentHeight = rt.rect.height - padTop - padBottom;
+
+        // Data
+        int n = values.Count; // prefer .Count over .Count()
+        if (n == 0) return; // or return;
+
+        // Y range with 20% headroom
+        double minYd = values.Min();
+        double maxYd = values.Max();
+        double range = Mathf.Max(1e-6f, (float)maxYd - (float)minYd); // prevent div by zero
+        double margin = 0.2 * range;
+
+        float yMin = (float)(minYd - margin);
+        float yMax = (float)(maxYd + margin);
+        float yRange = yMax - yMin;
+
+        // Clear previous points/lines if needed
+
+        GameObject lastDot = null;
+
+        // If only 1 point, place it in the middle on X for aesthetics
+        float denom = Mathf.Max(1, n - 1);
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (n == 1) ? 0.5f : (float)i / denom; // 0..1 across the width
+            float xPos = padLeft + t * contentWidth;
+
+            float v = (float)values[i];
+            float yNorm = Mathf.InverseLerp(yMin, yMax, v); // (v - yMin)/yRange
+            float yPos = padBottom + yNorm * contentHeight;
+
+            GameObject dot = CreateCircle(new Vector2(xPos, yPos));
+
+            if (lastDot != null)
+            {
+                CreateLine(
+                    lastDot.GetComponent<RectTransform>().anchoredPosition,
+                    dot.GetComponent<RectTransform>().anchoredPosition
+                );
+            }
+            lastDot = dot;
         }
     }
 
@@ -73,6 +225,18 @@ public class GraphMaker : MonoBehaviour
         lineRectTransform.anchoredPosition = dotA + dir * distance * 0.5f;
 
         lineRectTransform.localEulerAngles = new Vector3(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
+
+        allGraphElements.Add(line);
+    }
+
+    public void ClearGraph()
+    {
+        foreach (GameObject go in allGraphElements)
+        {
+            Destroy(go);
+        }
+
+        allGraphElements.Clear();
     }
 
 }

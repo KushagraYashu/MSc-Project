@@ -599,6 +599,11 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             foreach(var p in team1Players)
             {
                 p.playerData.Wins++;
+                p.playerData.Outcomes.Add(1);
+            }
+            foreach (var p in team2Players)
+            {
+                p.playerData.Outcomes.Add(0);
             }
         }
         else if(winner == 2)
@@ -607,6 +612,12 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             foreach(var p in team2Players)
             {
                 p.playerData.Wins++;
+                p.playerData.Outcomes.Add(1);
+
+            }
+            foreach (var p in team1Players)
+            {
+                p.playerData.Outcomes.Add(0);
             }
         }
 
@@ -622,9 +633,12 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
             p.conservativeValHistory.Add(p.playerData.TrueSkillRating.ConservativeRating);
             p.scaledRatingHistory.Add(p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal));
+
+            p.representationDirty = true;
+
         }
 
-        foreach(var p in team2Players)
+        foreach (var p in team2Players)
         {
             p.playerData.TrueSkillRating = newRatings[p];
 
@@ -632,7 +646,11 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
             p.conservativeValHistory.Add(p.playerData.TrueSkillRating.ConservativeRating);
             p.scaledRatingHistory.Add(p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal));
+
+            p.representationDirty = true;
+
         }
+
     }
 
     public bool TrySplitFairTeamsAsync(List<Player> pool, ref List<Player> team1, ref List<Player> team2)

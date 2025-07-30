@@ -56,7 +56,7 @@ public class PlayerData
     private uint _wins = 0;
 
     //history
-    private List<int> _outcomes = new();
+    public List<int> Outcomes = new();
 
     //matching threshold
     private double _matchingThreshold = 0;
@@ -133,7 +133,7 @@ public class PlayerData
         set { _deaths = value; }
     }
 
-    public double KDA
+    public double KDR
     {
         get { return _KDR; }
     }
@@ -183,16 +183,6 @@ public class PlayerData
     {
         get { return (int)_wins; }
         set { _wins = (uint)value; }
-    }
-
-    public List<int> Outcomes()
-    {
-        return _outcomes;
-    }
-
-    public void Outcomes(int value)
-    {
-        _outcomes.Add(value);
     }
 
     public void UpdateKDR()

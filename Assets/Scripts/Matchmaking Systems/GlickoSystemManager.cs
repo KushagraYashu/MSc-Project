@@ -656,7 +656,15 @@ public class GlickoSystemManager : MonoBehaviour
 
         double actualResult = winner == team ? 1.0 : 0.0;
 
-        if (actualResult == 1.0) p.playerData.Wins++;
+        if (actualResult == 1.0)
+        {
+            p.playerData.Wins++;
+            p.playerData.Outcomes.Add(1);
+        }
+        else
+        {
+            p.playerData.Outcomes.Add(0);
+        }
 
         double dSquared = 1.0 / (q * q * g * g * expectedScore * (1 - expectedScore));
 
@@ -673,6 +681,9 @@ public class GlickoSystemManager : MonoBehaviour
         p.RDHistory.Add((float)newRD);
         p.EloHistory.Add((float)newRating);
         p.totalChangeFromStart += (float)delta;
+
+        p.representationDirty = true;
+
 
         //Debug.Log($"Team {team} - Player {p.playerData.Id} Elo: {newRating:F2} (Delta: {delta:F2}), New RD: {newRD:F2}");
     }
