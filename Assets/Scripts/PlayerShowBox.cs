@@ -36,7 +36,7 @@ public class PlayerShowBox : MonoBehaviour
                 break;
         }
 
-        if (this.detailsPanel != null && this.detailsPanel.gameObject.activeInHierarchy && associatedPlayer.representationDirty)
+        if (this.detailsPanel != null && this.detailsPanel.gameObject.activeInHierarchy)
         {
             this.detailsPanel.ShowDetails(associatedPlayer);
         }

@@ -769,15 +769,20 @@ public class SmartMatchSystemManager : MonoBehaviour
             float team1Elo = CalcTeamElo(potentialTeam1);
             float team2Elo = CalcTeamElo(potentialTeam2);
 
-            if (t1HasLosingStreak && ((team1Elo - team2Elo) >= losingStreakThreshold))
+            //had to comment this bool check out, because it was making it impossible to find teams with only 1 losing streak side
+            if (/*!t2HasLosingStreak &&*/ t1HasLosingStreak && ((team1Elo - team2Elo) >= losingStreakThreshold))
             {
+                Debug.LogError("Losing Streak Match");
+
                 team1 = potentialTeam1;
                 team2 = potentialTeam2;
                 UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
                 return true;
             }
-            else if (t2HasLosingStreak && ((team2Elo - team1Elo) >= losingStreakThreshold))
+            else if (/*!t1HasLosingStreak &&*/ t2HasLosingStreak && ((team2Elo - team1Elo) >= losingStreakThreshold))
             {
+                Debug.LogError("Losing Streak Match");
+
                 team1 = potentialTeam1;
                 team2 = potentialTeam2;
                 UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);

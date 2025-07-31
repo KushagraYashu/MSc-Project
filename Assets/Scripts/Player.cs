@@ -55,7 +55,6 @@ public class Player
     public List<double> scaledSigmaHistory = new();
     public List<double> scaledConservativeValHistory = new();
 
-    public bool representationDirty = false;
 
     //[Header("Visual Components")]
     //public GameObject playerMesh;
