@@ -688,6 +688,8 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         p.playerData.Elo += delta;
 
+        //Some players will get a boost in their CS even after a loss because they performed very well and the weights are high.
+        //Players can also get A LOT plus or minus in CS, again due to high weights and dependance on multiple in-game factors.
         p.playerData.CalculateCompositeSkill();
 
         p.EloHistory.Add((float)p.playerData.CompositeSkill);
@@ -754,7 +756,8 @@ public class SmartMatchSystemManager : MonoBehaviour
             return false;
         }
 
-        int maxAttempts = (int)((pool.Count * 0.2) + pool.Count);
+        //Have to increase the number of attempts, because as the simulation progresses, it becomes harder to find fair teams, especially with the losing streak condition. Relying on random sampling also doesnt help.
+        int maxAttempts = (int)(pool.Count * 2);
 
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
@@ -772,8 +775,6 @@ public class SmartMatchSystemManager : MonoBehaviour
             //had to comment this bool check out, because it was making it impossible to find teams with only 1 losing streak side
             if (/*!t2HasLosingStreak &&*/ t1HasLosingStreak && ((team1Elo - team2Elo) >= losingStreakThreshold))
             {
-                Debug.LogError("Losing Streak Match");
-
                 team1 = potentialTeam1;
                 team2 = potentialTeam2;
                 UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
@@ -781,8 +782,6 @@ public class SmartMatchSystemManager : MonoBehaviour
             }
             else if (/*!t1HasLosingStreak &&*/ t2HasLosingStreak && ((team2Elo - team1Elo) >= losingStreakThreshold))
             {
-                Debug.LogError("Losing Streak Match");
-
                 team1 = potentialTeam1;
                 team2 = potentialTeam2;
                 UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
