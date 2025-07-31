@@ -207,7 +207,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             var pool = poolPlayersList[i].playersInPool;
             for (int j = 0; j < pool.Count; j++)
             {
-                float elo = (float)pool[j].playerData.Elo;
+                float elo = (float)pool[j].playerData.CompositeSkill;
                 float realSkill = (float)pool[j].playerData.RealSkill;
                 float error = elo - realSkill;
 
@@ -757,7 +757,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         }
 
         //Have to increase the number of attempts, because as the simulation progresses, it becomes harder to find fair teams, especially with the losing streak condition. Relying on random sampling also doesnt help.
-        int maxAttempts = (int)(pool.Count * 2);
+        int maxAttempts = (int)(pool.Count * 3);
 
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
@@ -772,29 +772,89 @@ public class SmartMatchSystemManager : MonoBehaviour
             float team1Elo = CalcTeamElo(potentialTeam1);
             float team2Elo = CalcTeamElo(potentialTeam2);
 
+            if (t1HasLosingStreak)
+            {
+                if(team1Elo - team2Elo >= losingStreakThreshold)
+                {
+                    team1 = potentialTeam1;
+                    team2 = potentialTeam2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                    return true;
+                }
+                else
+                {
+                    var playersExceptTeam1 = idlePlayers.Except(potentialTeam1).ToList();
+                    for (int i = 0; i < maxAttempts; i++)
+                    {
+                        var newTeam2 = RandomSample(playersExceptTeam1, teamSize);
+                        var newTeam2Elo = CalcTeamElo(newTeam2);
+                        if(team1Elo - newTeam2Elo >= losingStreakThreshold)
+                        {
+                            team1 = potentialTeam1;
+                            team2 = newTeam2;
+                            UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                            return true;
+                        }
+                    }
+                }
+            }
+            else if (t2HasLosingStreak)
+            {
+                if (team2Elo - team1Elo >= losingStreakThreshold)
+                {
+                    team1 = potentialTeam1;
+                    team2 = potentialTeam2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                    return true;
+                }
+                else
+                {
+                    var playersExceptTeam2 = idlePlayers.Except(potentialTeam2).ToList();
+                    for (int i = 0; i < maxAttempts; i++)
+                    {
+                        var newTeam1 = RandomSample(playersExceptTeam2, teamSize);
+                        var newTeam1Elo = CalcTeamElo(newTeam1);
+                        if (team2Elo - newTeam1Elo >= losingStreakThreshold)
+                        {
+                            team1 = newTeam1;
+                            team2 = potentialTeam2;
+                            UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                            return true;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if(Mathf.Abs(team1Elo - team2Elo) <= matchingThreshold)
+                {
+                    team1 = potentialTeam1;
+                    team2 = potentialTeam2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                    return true;
+                }
+            }
+
             //had to comment this bool check out, because it was making it impossible to find teams with only 1 losing streak side
-            if (/*!t2HasLosingStreak &&*/ t1HasLosingStreak && ((team1Elo - team2Elo) >= losingStreakThreshold))
-            {
-                team1 = potentialTeam1;
-                team2 = potentialTeam2;
-                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                return true;
-            }
-            else if (/*!t1HasLosingStreak &&*/ t2HasLosingStreak && ((team2Elo - team1Elo) >= losingStreakThreshold))
-            {
-                team1 = potentialTeam1;
-                team2 = potentialTeam2;
-                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                return true;
-            }
-            else if (!t1HasLosingStreak && !t2HasLosingStreak &&
-                     Mathf.Abs(team1Elo - team2Elo) <= matchingThreshold)
-            {
-                team1 = potentialTeam1;
-                team2 = potentialTeam2;
-                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                return true;
-            }
+            //if (/*!t2HasLosingStreak &&*/ t1HasLosingStreak && ((team1Elo - team2Elo) >= losingStreakThreshold))
+            //{
+
+            //}
+            //else if (/*!t1HasLosingStreak &&*/ t2HasLosingStreak && ((team2Elo - team1Elo) >= losingStreakThreshold))
+            //{
+            //    team1 = potentialTeam1;
+            //    team2 = potentialTeam2;
+            //    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+            //    return true;
+            //}
+            //else if (!t1HasLosingStreak && !t2HasLosingStreak &&
+            //         Mathf.Abs(team1Elo - team2Elo) <= matchingThreshold)
+            //{
+            //    team1 = potentialTeam1;
+            //    team2 = potentialTeam2;
+            //    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+            //    return true;
+            //}
         }
 
         Debug.LogWarning("No fair team found after many attempts.");
