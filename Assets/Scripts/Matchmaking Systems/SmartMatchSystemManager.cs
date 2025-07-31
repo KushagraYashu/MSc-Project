@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 
@@ -78,6 +79,14 @@ public class SmartMatchSystemManager : MonoBehaviour
     {
 
     }
+
+    public struct TeamSplitResult
+    {
+        public List<Player> team1;
+        public List<Player> team2;
+        public bool success;
+    }
+
 
     public void SetupSmartMatchSystem(int MPP)
     {
@@ -361,27 +370,24 @@ public class SmartMatchSystemManager : MonoBehaviour
         return list;
     }
 
-    public void StartTeamSplit(List<Player> playerPool, int whichPool, int matchSim)
+    public async void StartTeamSplit(List<Player> playerPool, int whichPool, int matchSim)
     {
-        List<Player> team1 = new();
-        List<Player> team2 = new();
-
         Shuffle(playerPool);
 
-        bool teamsCreated = TrySplitFairTeamsAsync(playerPool, ref team1, ref team2);
-
-        if ((teamsCreated))
+        var result = await Task.Run(() =>
         {
-            //Debug.Log("Do the Match");
-            for (int i = 0; i < team1.Count; i++)
-            {
-                team1[i].playerData.MatchesToPlay--;
-            }
-            for (int i = 0; i < team2.Count; i++)
-            {
-                team2[i].playerData.MatchesToPlay--;
-            }
-            StartCoroutine(SimulateMatch(team1, team2, matchSim));
+            return TrySplitFairTeams(playerPool);
+        });
+
+        if (result.success)
+        {
+            foreach (var p in result.team1) p.playerData.MatchesToPlay--;
+            foreach (var p in result.team2) p.playerData.MatchesToPlay--;
+
+            // Set players to playing state
+            UpdatePlayerStatusForBothTeams(ref result.team1, ref result.team2, true);
+
+            StartCoroutine(SimulateMatch(result.team1, result.team2, matchSim));
         }
         else
         {
@@ -398,6 +404,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                 whichPool++;
             }
 
+            // Recursively try with expanded pool
             StartTeamSplit(combinedPool, whichPool, matchSim);
         }
     }
@@ -742,123 +749,63 @@ public class SmartMatchSystemManager : MonoBehaviour
         return list.OrderBy(x => rng.Next()).Take(count).ToList();
     }
 
-    public bool TrySplitFairTeamsAsync(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
+    public TeamSplitResult TrySplitFairTeams(List<Player> pool)
     {
-        team1.Clear();
-        team2.Clear();
-
         List<Player> idlePlayers = pool.Where(p => p.playerState == Player.PlayerState.Idle).ToList();
 
         int totalRequired = teamSize * 2;
         if (idlePlayers.Count < totalRequired)
         {
-            Debug.LogError($"Not enough IDLE players. Needed: {totalRequired}, Found: {idlePlayers.Count}");
-            return false;
+            return new TeamSplitResult { success = false };
         }
 
-        //Have to increase the number of attempts, because as the simulation progresses, it becomes harder to find fair teams, especially with the losing streak condition. Relying on random sampling also doesnt help.
-        int maxAttempts = (int)(pool.Count * 3);
+        int maxAttempts = pool.Count * 3;
 
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
-            var selectedPlayers = RandomSample(idlePlayers, totalRequired);
-            var potentialTeam1 = selectedPlayers.Take(teamSize).ToList();
-            var potentialTeam2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
+            var selected = RandomSample(idlePlayers, totalRequired);
+            var t1 = selected.Take(teamSize).ToList();
+            var t2 = selected.Skip(teamSize).Take(teamSize).ToList();
 
-            // Check for losing streak players
-            bool t1HasLosingStreak = potentialTeam1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
-            bool t2HasLosingStreak = potentialTeam2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+            bool t1Losing = t1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+            bool t2Losing = t2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
 
-            float team1Elo = CalcTeamElo(potentialTeam1);
-            float team2Elo = CalcTeamElo(potentialTeam2);
+            float t1Elo = CalcTeamElo(t1);
+            float t2Elo = CalcTeamElo(t2);
 
-            if (t1HasLosingStreak)
+            if (t1Losing)
             {
-                if(team1Elo - team2Elo >= losingStreakThreshold)
+                if (t1Elo - t2Elo >= losingStreakThreshold)
+                    return new TeamSplitResult { success = true, team1 = t1, team2 = t2 };
+
+                var others = idlePlayers.Except(t1).ToList();
+                for (int i = 0; i < maxAttempts; i++)
                 {
-                    team1 = potentialTeam1;
-                    team2 = potentialTeam2;
-                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                    return true;
-                }
-                else
-                {
-                    var playersExceptTeam1 = idlePlayers.Except(potentialTeam1).ToList();
-                    for (int i = 0; i < maxAttempts; i++)
-                    {
-                        var newTeam2 = RandomSample(playersExceptTeam1, teamSize);
-                        var newTeam2Elo = CalcTeamElo(newTeam2);
-                        if(team1Elo - newTeam2Elo >= losingStreakThreshold)
-                        {
-                            team1 = potentialTeam1;
-                            team2 = newTeam2;
-                            UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                            return true;
-                        }
-                    }
+                    var altT2 = RandomSample(others, teamSize);
+                    if (t1Elo - CalcTeamElo(altT2) >= losingStreakThreshold)
+                        return new TeamSplitResult { success = true, team1 = t1, team2 = altT2 };
                 }
             }
-            else if (t2HasLosingStreak)
+            else if (t2Losing)
             {
-                if (team2Elo - team1Elo >= losingStreakThreshold)
+                if (t2Elo - t1Elo >= losingStreakThreshold)
+                    return new TeamSplitResult { success = true, team1 = t1, team2 = t2 };
+
+                var others = idlePlayers.Except(t2).ToList();
+                for (int i = 0; i < maxAttempts; i++)
                 {
-                    team1 = potentialTeam1;
-                    team2 = potentialTeam2;
-                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                    return true;
-                }
-                else
-                {
-                    var playersExceptTeam2 = idlePlayers.Except(potentialTeam2).ToList();
-                    for (int i = 0; i < maxAttempts; i++)
-                    {
-                        var newTeam1 = RandomSample(playersExceptTeam2, teamSize);
-                        var newTeam1Elo = CalcTeamElo(newTeam1);
-                        if (team2Elo - newTeam1Elo >= losingStreakThreshold)
-                        {
-                            team1 = newTeam1;
-                            team2 = potentialTeam2;
-                            UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                            return true;
-                        }
-                    }
+                    var altT1 = RandomSample(others, teamSize);
+                    if (CalcTeamElo(altT1) <= t2Elo - losingStreakThreshold)
+                        return new TeamSplitResult { success = true, team1 = altT1, team2 = t2 };
                 }
             }
-            else
+            else if (Math.Abs(t1Elo - t2Elo) <= matchingThreshold)
             {
-                if(Mathf.Abs(team1Elo - team2Elo) <= matchingThreshold)
-                {
-                    team1 = potentialTeam1;
-                    team2 = potentialTeam2;
-                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                    return true;
-                }
+                return new TeamSplitResult { success = true, team1 = t1, team2 = t2 };
             }
-
-            //had to comment this bool check out, because it was making it impossible to find teams with only 1 losing streak side
-            //if (/*!t2HasLosingStreak &&*/ t1HasLosingStreak && ((team1Elo - team2Elo) >= losingStreakThreshold))
-            //{
-
-            //}
-            //else if (/*!t1HasLosingStreak &&*/ t2HasLosingStreak && ((team2Elo - team1Elo) >= losingStreakThreshold))
-            //{
-            //    team1 = potentialTeam1;
-            //    team2 = potentialTeam2;
-            //    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-            //    return true;
-            //}
-            //else if (!t1HasLosingStreak && !t2HasLosingStreak &&
-            //         Mathf.Abs(team1Elo - team2Elo) <= matchingThreshold)
-            //{
-            //    team1 = potentialTeam1;
-            //    team2 = potentialTeam2;
-            //    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-            //    return true;
-            //}
         }
 
-        Debug.LogWarning("No fair team found after many attempts.");
-        return false;
+        return new TeamSplitResult { success = false };
     }
 
 
