@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.LowLevel;
 
 public class SmartMatchSystemManager : MonoBehaviour
 {
@@ -179,7 +180,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                 if (i == 0)
                     newPlayer.playerPlayStyles.Add(Player.PlayerPlayStyle.Basic);
 
-                newPlayer.playerData.CalculateCompositeSkill();
+                newPlayer.playerData.CalculateAndAssignCompositeSkill();
                 newPlayer.playerData.MatchesToPlay = MPP;
                 newPlayer.EloHistory.Add((float)newPlayer.playerData.CompositeSkill);
                 newPlayer.poolHistory.Add(i);
@@ -370,24 +371,24 @@ public class SmartMatchSystemManager : MonoBehaviour
         return list;
     }
 
-    public async void StartTeamSplit(List<Player> playerPool, int whichPool, int matchSim)
+    public void StartTeamSplit(List<Player> playerPool, int whichPool, int matchSim)
     {
+        List<Player> team1 = new();
+        List<Player> team2 = new();
+
         Shuffle(playerPool);
 
-        var result = await Task.Run(() =>
-        {
-            return TrySplitFairTeams(playerPool);
-        });
+        bool result = TrySplitFairTeams(playerPool, ref team1, ref team2);
 
-        if (result.success)
+        if (result)
         {
-            foreach (var p in result.team1) p.playerData.MatchesToPlay--;
-            foreach (var p in result.team2) p.playerData.MatchesToPlay--;
+            foreach (var p in team1) p.playerData.MatchesToPlay--;
+            foreach (var p in team2) p.playerData.MatchesToPlay--;
 
             // Set players to playing state
-            UpdatePlayerStatusForBothTeams(ref result.team1, ref result.team2, true);
+            UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
 
-            StartCoroutine(SimulateMatch(result.team1, result.team2, matchSim));
+            StartCoroutine(SimulateMatch(team1, team2, matchSim));
         }
         else
         {
@@ -695,9 +696,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         p.playerData.Elo += delta;
 
-        //Some players will get a boost in their CS even after a loss because they performed very well and the weights are high.
-        //Players can also get A LOT plus or minus in CS, again due to high weights and dependance on multiple in-game factors.
-        p.playerData.CalculateCompositeSkill();
+        p.playerData.UpdateCompositeSkill((int)actualResult);
 
         p.EloHistory.Add((float)p.playerData.CompositeSkill);
         p.totalChangeFromStart += (float)(p.playerData.CompositeSkill - oldCS);
@@ -711,8 +710,7 @@ public class SmartMatchSystemManager : MonoBehaviour
     double CalculatePerformanceMultiplier(Player player, double oldCS)
     {
         double beforeMatchCS = oldCS;
-        player.playerData.CalculateCompositeSkill();
-        double afterMatchCS = player.playerData.CompositeSkill;
+        double afterMatchCS = player.playerData.GetCompositeSkillCalculation();
 
         if (beforeMatchCS == 0) return 1.0;
 
@@ -744,68 +742,296 @@ public class SmartMatchSystemManager : MonoBehaviour
         return (float)weightedElo;
     }
 
+    //used in earlier approaches when system depended on random selection rather than sorting
     private List<Player> RandomSample(List<Player> list, int count)
     {
         return list.OrderBy(x => rng.Next()).Take(count).ToList();
     }
 
-    public TeamSplitResult TrySplitFairTeams(List<Player> pool)
+    bool flip = false;
+    public bool TrySplitFairTeams(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
     {
-        List<Player> idlePlayers = pool.Where(p => p.playerState == Player.PlayerState.Idle).ToList();
+        //players available for matching must be IDLE and have played less than 150 games
+        var idlePlayers = pool
+                            .Where(p => p.playerState == Player.PlayerState.Idle)
+                            .OrderBy(p => p.playerData.CompositeSkill)
+                            .ToList();
 
-        int totalRequired = teamSize * 2;
-        if (idlePlayers.Count < totalRequired)
+        //matching players based on sorted composite skill
+        if (!flip)
         {
-            return new TeamSplitResult { success = false };
+            for (int i = 0; i + teamSize * 2 <= idlePlayers.Count; i += teamSize * 2)
+            {
+                var batch = idlePlayers.GetRange(i, teamSize * 2);
+
+                List<Player> potentialTeam1 = new();
+                List<Player> potentialTeam2 = new();
+
+                for (int j = 0; j < teamSize * 2; j += 2)
+                {
+                    potentialTeam1.Add(batch[j]);
+                }
+                for (int k = 1; k < teamSize * 2; k += 2)
+                {
+                    potentialTeam2.Add(batch[k]);
+                }
+
+                // Losing streak compensation
+                if (CheckLosingStreakBiasAndFairness(potentialTeam1, potentialTeam2))
+                {
+                    team1 = potentialTeam1;
+                    team2 = potentialTeam2;
+                    flip = true;
+                    return true;
+                }
+            }
+
+            flip = true;
+        }
+        if (flip)
+        {
+            for (int i = idlePlayers.Count - teamSize * 2; i >= 0; i -= teamSize * 2)
+            {
+                var batch = idlePlayers.GetRange(i, teamSize * 2);
+
+                List<Player> potentialTeam1 = new();
+                List<Player> potentialTeam2 = new();
+
+                for (int j = 0; j < teamSize * 2; j += 2)
+                {
+                    potentialTeam1.Add(batch[j]);
+                }
+                for (int k = 1; k < teamSize * 2; k += 2)
+                {
+                    potentialTeam2.Add(batch[k]);
+                }
+
+                // Losing streak compensation
+                if (CheckLosingStreakBiasAndFairness(potentialTeam1, potentialTeam2))
+                {
+                    team1 = potentialTeam1;
+                    team2 = potentialTeam2;
+                    flip = false;
+                    return true;
+                }
+            }
+
+            flip = false;
         }
 
-        int maxAttempts = pool.Count * 3;
-
+        //sorting has failed, try random sample
+        var idlePlayersShuffled = ShuffleCopy(idlePlayers);
+        int maxAttempts = idlePlayersShuffled.Count * 2;
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
-            var selected = RandomSample(idlePlayers, totalRequired);
-            var t1 = selected.Take(teamSize).ToList();
-            var t2 = selected.Skip(teamSize).Take(teamSize).ToList();
+            HashSet<int> selectedIndices = new();
 
-            bool t1Losing = t1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
-            bool t2Losing = t2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+            // Select 2 * teamSize unique indices randomly from the idlePlayers list
+            while (selectedIndices.Count < teamSize * 2)
+            {
+                int randIndex = rng.Next(idlePlayersShuffled.Count);
+                selectedIndices.Add(randIndex);
+            }
+
+            // Convert to list for indexing
+            var selectedPlayers = selectedIndices.Select(i => idlePlayersShuffled[i]).ToList();
+
+            // Shuffle the selected players (small list, so fast)
+            for (int i = selectedPlayers.Count - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (selectedPlayers[i], selectedPlayers[j]) = (selectedPlayers[j], selectedPlayers[i]);
+            }
+
+            // Split into two teams
+            var t1 = selectedPlayers.Take(teamSize).ToList();
+            var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
 
             float t1Elo = CalcTeamElo(t1);
             float t2Elo = CalcTeamElo(t2);
 
-            if (t1Losing)
-            {
-                if (t1Elo - t2Elo >= losingStreakThreshold)
-                    return new TeamSplitResult { success = true, team1 = t1, team2 = t2 };
+            bool t1HasLosingStreak = t1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+            bool t2HasLosingStreak = t2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
 
-                var others = idlePlayers.Except(t1).ToList();
-                for (int i = 0; i < maxAttempts; i++)
+            if(!t1HasLosingStreak && t2HasLosingStreak)
+            {
+                if(t2Elo - t1Elo >= losingStreakThreshold)
                 {
-                    var altT2 = RandomSample(others, teamSize);
-                    if (t1Elo - CalcTeamElo(altT2) >= losingStreakThreshold)
-                        return new TeamSplitResult { success = true, team1 = t1, team2 = altT2 };
+                    team1 = t1;
+                    team2 = t2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                    return true;
                 }
             }
-            else if (t2Losing)
-            {
-                if (t2Elo - t1Elo >= losingStreakThreshold)
-                    return new TeamSplitResult { success = true, team1 = t1, team2 = t2 };
 
-                var others = idlePlayers.Except(t2).ToList();
-                for (int i = 0; i < maxAttempts; i++)
+            if(!t2HasLosingStreak && t1HasLosingStreak)
+            {
+                if(t1Elo - t2Elo >= losingStreakThreshold)
                 {
-                    var altT1 = RandomSample(others, teamSize);
-                    if (CalcTeamElo(altT1) <= t2Elo - losingStreakThreshold)
-                        return new TeamSplitResult { success = true, team1 = altT1, team2 = t2 };
+                    team1 = t1;
+                    team2 = t2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                    return true;
                 }
             }
-            else if (Math.Abs(t1Elo - t2Elo) <= matchingThreshold)
+
+            if (!t1HasLosingStreak && !t2HasLosingStreak && Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
             {
-                return new TeamSplitResult { success = true, team1 = t1, team2 = t2 };
+                team1 = t1;
+                team2 = t2;
+                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                return true;
             }
         }
 
-        return new TeamSplitResult { success = false };
+        //both sorting and random sampling has failed, relaxing the losing threshold and trying sorting-based selection again
+        if (!flip)
+        {
+            for (int i = 0; i + teamSize * 2 <= idlePlayers.Count; i += teamSize * 2)
+            {
+                var batch = idlePlayers.GetRange(i, teamSize * 2);
+
+                List<Player> potentialTeam1 = new();
+                List<Player> potentialTeam2 = new();
+
+                for (int j = 0; j < teamSize * 2; j += 2)
+                {
+                    potentialTeam1.Add(batch[j]);
+                }
+                for (int k = 1; k < teamSize * 2; k += 2)
+                {
+                    potentialTeam2.Add(batch[k]);
+                }
+
+                // Losing streak compensation
+                if (CheckLosingStreakBiasAndFairness(potentialTeam1, potentialTeam2, relax: true))
+                {
+                    team1 = potentialTeam1;
+                    team2 = potentialTeam2;
+                    flip = true;
+                    return true;
+                }
+            }
+
+            flip = true;
+        }
+        if (flip)
+        {
+            for (int i = idlePlayers.Count - teamSize * 2; i >= 0; i -= teamSize * 2)
+            {
+                var batch = idlePlayers.GetRange(i, teamSize * 2);
+
+                List<Player> potentialTeam1 = new();
+                List<Player> potentialTeam2 = new();
+
+                for (int j = 0; j < teamSize * 2; j += 2)
+                {
+                    potentialTeam1.Add(batch[j]);
+                }
+                for (int k = 1; k < teamSize * 2; k += 2)
+                {
+                    potentialTeam2.Add(batch[k]);
+                }
+
+                // Losing streak compensation
+                if (CheckLosingStreakBiasAndFairness(potentialTeam1, potentialTeam2, relax: true))
+                {
+                    team1 = potentialTeam1;
+                    team2 = potentialTeam2;
+                    flip = false;
+                    return true;
+                }
+            }
+
+            flip = false;
+        }
+
+        //random sampling with relaxed losing streak threshold
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            HashSet<int> selectedIndices = new();
+
+            // Select 2 * teamSize unique indices randomly from the idlePlayers list
+            while (selectedIndices.Count < teamSize * 2)
+            {
+                int randIndex = rng.Next(idlePlayersShuffled.Count);
+                selectedIndices.Add(randIndex);
+            }
+
+            // Convert to list for indexing
+            var selectedPlayers = selectedIndices.Select(i => idlePlayersShuffled[i]).ToList();
+
+            // Shuffle the selected players (small list, so fast)
+            for (int i = selectedPlayers.Count - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (selectedPlayers[i], selectedPlayers[j]) = (selectedPlayers[j], selectedPlayers[i]);
+            }
+
+            // Split into two teams
+            var t1 = selectedPlayers.Take(teamSize).ToList();
+            var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
+
+            float t1Elo = CalcTeamElo(t1);
+            float t2Elo = CalcTeamElo(t2);
+
+            bool t1HasLosingStreak = t1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+            bool t2HasLosingStreak = t2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+
+            if (!t1HasLosingStreak && t2HasLosingStreak)
+            {
+                if (t2Elo - t1Elo >= (losingStreakThreshold / 1.5f))
+                {
+                    team1 = t1;
+                    team2 = t2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                    return true;
+                }
+            }
+
+            if (!t2HasLosingStreak && t1HasLosingStreak)
+            {
+                if (t1Elo - t2Elo >= (losingStreakThreshold / 1.5f))
+                {
+                    team1 = t1;
+                    team2 = t2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                    return true;
+                }
+            }
+
+            if (!t1HasLosingStreak && !t2HasLosingStreak && Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
+            {
+                team1 = t1;
+                team2 = t2;
+                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool CheckLosingStreakBiasAndFairness(List<Player> team1, List<Player> team2, bool relax = false)
+    {
+        bool t1HasLosingStreak = team1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+        bool t2HasLosingStreak = team2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+
+        float t1Elo = CalcTeamElo(team1);
+        float t2Elo = CalcTeamElo(team2);
+
+        float losingStreakThreshold = this.losingStreakThreshold;
+        if (relax)
+            losingStreakThreshold /= 1.5f;
+
+        if (t1HasLosingStreak && !t2HasLosingStreak && (t1Elo - t2Elo >= losingStreakThreshold))
+            return true;
+        else if (t2HasLosingStreak && !t1HasLosingStreak && (t2Elo - t1Elo >= losingStreakThreshold))
+            return true;
+        else if (!t1HasLosingStreak && !t2HasLosingStreak)
+            return Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold;
+        else
+            return false;
     }
 
 

@@ -221,7 +221,44 @@ public class PlayerData
         }
     }
 
-    public void CalculateCompositeSkill()
+    public void UpdateCompositeSkill(int outcome)
+    {
+        var curCS = _compositeSkill;
+
+        UpdateAssistRatio();
+        UpdateClutchRatio();
+
+        var newCS =
+            _We * _elo +
+            _Wk * _KDR +
+            _Wa * _assistRatio +
+            _Wc * _clutchRatio +
+            _Wx * _gamesPlayed;
+
+        if (outcome == 0)
+        {
+            //making sure composite skill always decreases (by at least 2) in a loss
+            _compositeSkill = Mathf.Min((float)(curCS - 2), (float)newCS);
+        }
+        else
+        {
+            //limiting the composite skill increase to 100 (a player will require at least 4 games to rank up from a pool)
+            _compositeSkill = Mathf.Min((float)newCS, (float)(curCS + 100));
+        }
+    }
+
+    public float GetCompositeSkillCalculation()
+    {
+        return (float)(
+            _We * _elo +
+            _Wk * _KDR +
+            _Wa * _assistRatio +
+            _Wc * _clutchRatio +
+            _Wx * _gamesPlayed
+        );
+    }
+
+    public void CalculateAndAssignCompositeSkill()
     {
         UpdateAssistRatio();
         UpdateClutchRatio();

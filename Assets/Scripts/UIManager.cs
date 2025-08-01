@@ -82,24 +82,28 @@ public class UIManager : MonoBehaviour
         {
             case 0: //Elo
                 pool = EloSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+                snapshot = new List<Player>(pool.Where(p => p != null));
+                snapshot = snapshot.OrderBy(p => p.playerData.Elo).ToList();
                 break;
 
             case 1: //glicko
                 pool = GlickoSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+                snapshot = new List<Player>(pool.Where(p => p != null));
+                snapshot = snapshot.OrderBy(p => p.playerData.Elo).ToList();
                 break;
 
             case 2: //vanilla trueskill (moserware)
                 pool = VanillaTrueskillSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+                snapshot = new List<Player>(pool.Where(p => p != null));
+                snapshot = snapshot.OrderBy(p => p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y)).ToList();
                 break;
 
             case 3: //smart match
                 pool = SmartMatchSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
+                snapshot = new List<Player>(pool.Where(p => p != null));
+                snapshot = snapshot.OrderBy(p => p.playerData.CompositeSkill).ToList();
                 break;
         }
-
-        snapshot = new List<Player>(pool.Where(p => p != null));
-
-        snapshot = snapshot.OrderBy(p => p.playerData.Id).ToList();
 
         int count = Mathf.Min(allShowBoxes.Count, snapshot.Count);
 
