@@ -32,7 +32,7 @@ public class PlayerData
     //composite skill
     [SerializeField] private double _compositeSkill = 0;
     private double _We = 1.00;
-    private double _Wk = 10.500;
+    private double _Wk = 12.500;
     private double _Wa = 5.000;
     private double _Wc = 7.000;
     private double _Wx = 0.25;

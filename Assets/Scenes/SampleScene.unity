@@ -37740,7 +37740,7 @@ MonoBehaviour:
   maxRoundsPerMatch: 3
   teamSize: 5
   matchingThreshold: 50
-  losingStreakThreshold: 100
+  losingStreakThreshold: 75
   logTeams: 1
   poolPlayersList: []
 --- !u!1 &1460064736

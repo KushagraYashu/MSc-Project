@@ -716,8 +716,8 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         double performanceRatio = afterMatchCS / beforeMatchCS;
 
-        if (performanceRatio > 2.0) return 2.0;
-        if (performanceRatio > 1.5) return 1.8;
+        if (performanceRatio > 2.0) return 2.5;
+        if (performanceRatio > 1.5) return 2.0;
         if (performanceRatio > 1.2) return 1.5;
         return 1.0;
     }
@@ -780,6 +780,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                 {
                     team1 = potentialTeam1;
                     team2 = potentialTeam2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
                     flip = true;
                     return true;
                 }
@@ -810,6 +811,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                 {
                     team1 = potentialTeam1;
                     team2 = potentialTeam2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
                     flip = false;
                     return true;
                 }
@@ -846,160 +848,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             var t1 = selectedPlayers.Take(teamSize).ToList();
             var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
 
-            float t1Elo = CalcTeamElo(t1);
-            float t2Elo = CalcTeamElo(t2);
-
-            bool t1HasLosingStreak = t1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
-            bool t2HasLosingStreak = t2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
-
-            if(t2HasLosingStreak && !t1HasLosingStreak)
-            {
-                if(t2Elo - t1Elo >= losingStreakThreshold)
-                {
-                    team1 = t1;
-                    team2 = t2;
-                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                    return true;
-                }
-            }
-
-            if(t1HasLosingStreak && !t2HasLosingStreak)
-            {
-                if(t1Elo - t2Elo >= losingStreakThreshold)
-                {
-                    team1 = t1;
-                    team2 = t2;
-                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                    return true;
-                }
-            }
-
-            if (!t1HasLosingStreak && !t2HasLosingStreak && Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
-            {
-                team1 = t1;
-                team2 = t2;
-                UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                return true;
-            }
-        }
-
-        //both sorting and random sampling has failed, removing the losing exclusivity among teams and trying sorting-based selection again
-        if (!flip)
-        {
-            for (int i = 0; i + teamSize * 2 <= idlePlayers.Count; i += teamSize * 2)
-            {
-                var batch = idlePlayers.GetRange(i, teamSize * 2);
-
-                List<Player> potentialTeam1 = new();
-                List<Player> potentialTeam2 = new();
-
-                for (int j = 0; j < teamSize * 2; j += 2)
-                {
-                    potentialTeam1.Add(batch[j]);
-                }
-                for (int k = 1; k < teamSize * 2; k += 2)
-                {
-                    potentialTeam2.Add(batch[k]);
-                }
-
-                // Losing streak compensation
-                if (CheckLosingStreakBiasAndFairness(potentialTeam1, potentialTeam2, relax: true))
-                {
-                    team1 = potentialTeam1;
-                    team2 = potentialTeam2;
-                    flip = true;
-                    return true;
-                }
-            }
-
-            flip = true;
-        }
-        if (flip)
-        {
-            for (int i = idlePlayers.Count - teamSize * 2; i >= 0; i -= teamSize * 2)
-            {
-                var batch = idlePlayers.GetRange(i, teamSize * 2);
-
-                List<Player> potentialTeam1 = new();
-                List<Player> potentialTeam2 = new();
-
-                for (int j = 0; j < teamSize * 2; j += 2)
-                {
-                    potentialTeam1.Add(batch[j]);
-                }
-                for (int k = 1; k < teamSize * 2; k += 2)
-                {
-                    potentialTeam2.Add(batch[k]);
-                }
-
-                // Losing streak compensation
-                if (CheckLosingStreakBiasAndFairness(potentialTeam1, potentialTeam2, relax: true))
-                {
-                    team1 = potentialTeam1;
-                    team2 = potentialTeam2;
-                    flip = false;
-                    return true;
-                }
-            }
-
-            flip = false;
-        }
-
-        //random sampling with relaxed exclusivity
-        for (int attempt = 0; attempt < maxAttempts; attempt++)
-        {
-            HashSet<int> selectedIndices = new();
-
-            // Select 2 * teamSize unique indices randomly from the idlePlayers list
-            while (selectedIndices.Count < teamSize * 2)
-            {
-                int randIndex = rng.Next(idlePlayersShuffled.Count);
-                selectedIndices.Add(randIndex);
-            }
-
-            // Convert to list for indexing
-            var selectedPlayers = selectedIndices.Select(i => idlePlayersShuffled[i]).ToList();
-
-            // Shuffle the selected players (small list, so fast)
-            for (int i = selectedPlayers.Count - 1; i > 0; i--)
-            {
-                int j = rng.Next(i + 1);
-                (selectedPlayers[i], selectedPlayers[j]) = (selectedPlayers[j], selectedPlayers[i]);
-            }
-
-            // Split into two teams
-            var t1 = selectedPlayers.Take(teamSize).ToList();
-            var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
-
-            float t1Elo = CalcTeamElo(t1);
-            float t2Elo = CalcTeamElo(t2);
-
-            bool t1HasLosingStreak = t1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
-            bool t2HasLosingStreak = t2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
-
-            if (t2HasLosingStreak)
-            {
-                if (t2Elo - t1Elo >= (losingStreakThreshold / 1.5f))
-                {
-                    team1 = t1;
-                    team2 = t2;
-                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                    return true;
-                }
-            }
-
-            if (t1HasLosingStreak)
-            {
-                if (t1Elo - t2Elo >= (losingStreakThreshold / 1.5f))
-                {
-                    team1 = t1;
-                    team2 = t2;
-                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
-                    return true;
-                }
-            }
-
-            if (!t1HasLosingStreak && !t2HasLosingStreak && Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
+            if(CheckLosingStreakBiasAndFairness(t1, t2))
             {
                 team1 = t1;
                 team2 = t2;
@@ -1011,33 +860,69 @@ public class SmartMatchSystemManager : MonoBehaviour
         return false;
     }
 
-    bool CheckLosingStreakBiasAndFairness(List<Player> team1, List<Player> team2, bool relax = false)
+    bool CheckLosingStreakBiasAndFairness(List<Player> team1, List<Player> team2)
     {
-        bool t1HasLosingStreak = team1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
-        bool t2HasLosingStreak = team2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
+        var t1Streak = IsOnLosingStreak(team1); // returns (Bool, Count)
+        var t2Streak = IsOnLosingStreak(team2);
 
         float t1Elo = CalcTeamElo(team1);
         float t2Elo = CalcTeamElo(team2);
 
-        if (relax)
+        if (t1Streak.Bool && !t2Streak.Bool)    //only team 1 has a losing streak
         {
-            if (t1HasLosingStreak && (t1Elo - t2Elo >= losingStreakThreshold))
-                return true;
-            else if (t2HasLosingStreak && (t2Elo - t1Elo >= losingStreakThreshold))
-                return true;
+            return (t1Elo - t2Elo) >= losingStreakThreshold;
         }
-        else
+        else if (!t1Streak.Bool && t2Streak.Bool)   //only team 2 has a losing streak
         {
-            if (!t2HasLosingStreak && t1HasLosingStreak && (t1Elo - t2Elo >= losingStreakThreshold))
-                return true;
-            else if (!t1HasLosingStreak && t2HasLosingStreak && (t2Elo - t1Elo >= losingStreakThreshold))
-                return true;
+            return (t2Elo - t1Elo) >= losingStreakThreshold;
+        }
+        else if (t1Streak.Bool && t2Streak.Bool)    //both team have losing streaks
+        {
+            if (t1Streak.Count > t2Streak.Count)    //team 1 has more players on losing streak
+            {
+                return (t1Elo - t2Elo) >= losingStreakThreshold;
+            }
+            else if (t2Streak.Count > t1Streak.Count)   //team 2 has more players on losing streak
+            {
+                return (t2Elo - t1Elo) >= losingStreakThreshold;
+            }
+            else // Equal streak count
+            {
+                return Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold;
+            }
         }
 
-        if (!t1HasLosingStreak && !t2HasLosingStreak)
-            return Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold;
-        else
-            return false;
+        // Neither team has streaks
+        return Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold;
+    }
+
+
+    public (bool Bool, int Count) IsOnLosingStreak(List<Player> players)
+    {
+        int playersOnLosingStreak = 0;
+        int losingStreakThreshold = 3;
+
+        foreach (var player in players)
+        {
+            int count = 0;
+            var outcomes = player.playerData.Outcomes;
+            for (int i = outcomes.Count - 1; i >= 0; i--)
+            {
+                if (outcomes[i] == 0)
+                {
+                    count++;
+                    if (count >= losingStreakThreshold)
+                    {
+                        playersOnLosingStreak++;
+                        break;
+                    }
+                }
+                else break;
+            }
+        }
+
+        if(playersOnLosingStreak > 0) return (true, playersOnLosingStreak);
+        else return (false, 0);
     }
 
 
