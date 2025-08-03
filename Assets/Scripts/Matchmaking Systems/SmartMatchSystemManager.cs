@@ -392,9 +392,9 @@ public class SmartMatchSystemManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Could not find suitable teams, trying again with merging another pool");
+            Debug.LogError($"Could not find suitable teams in {whichPool}, trying again with merging another pool");
             var combinedPool = new List<Player>(poolPlayersList[whichPool].playersInPool);
-            if (whichPool > 0)
+            if (whichPool > 1)
             {
                 combinedPool.AddRange(poolPlayersList[whichPool - 1].playersInPool);
                 whichPool--;
@@ -716,16 +716,15 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         double performanceRatio = afterMatchCS / beforeMatchCS;
 
-        if (performanceRatio > 2.0) return 2.5;
-        if (performanceRatio > 1.5) return 2.0;
+        if (performanceRatio > 2.0) return 2.0;
+        if (performanceRatio > 1.5) return 1.8;
         if (performanceRatio > 1.2) return 1.5;
-        if (performanceRatio > 1.0) return 1.2;
         return 1.0;
     }
 
     float CalcTeamElo(List<Player> team)
     {
-        var sorted = team.OrderByDescending(p => p.playerData.Elo).ToList();
+        var sorted = team.OrderByDescending(p => p.playerData.CompositeSkill).ToList();
 
         // Apply weights
         // values are from
@@ -751,7 +750,7 @@ public class SmartMatchSystemManager : MonoBehaviour
     bool flip = false;
     public bool TrySplitFairTeams(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
     {
-        //players available for matching must be IDLE and have played less than 150 games
+        //players available for matching must be IDLE
         var idlePlayers = pool
                             .Where(p => p.playerState == Player.PlayerState.Idle)
                             .OrderBy(p => p.playerData.CompositeSkill)
@@ -853,7 +852,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             bool t1HasLosingStreak = t1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
             bool t2HasLosingStreak = t2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
 
-            if(!t1HasLosingStreak && t2HasLosingStreak)
+            if(t2HasLosingStreak && !t1HasLosingStreak)
             {
                 if(t2Elo - t1Elo >= losingStreakThreshold)
                 {
@@ -864,7 +863,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                 }
             }
 
-            if(!t2HasLosingStreak && t1HasLosingStreak)
+            if(t1HasLosingStreak && !t2HasLosingStreak)
             {
                 if(t1Elo - t2Elo >= losingStreakThreshold)
                 {
@@ -884,7 +883,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             }
         }
 
-        //both sorting and random sampling has failed, relaxing the losing threshold and trying sorting-based selection again
+        //both sorting and random sampling has failed, removing the losing exclusivity among teams and trying sorting-based selection again
         if (!flip)
         {
             for (int i = 0; i + teamSize * 2 <= idlePlayers.Count; i += teamSize * 2)
@@ -946,7 +945,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             flip = false;
         }
 
-        //random sampling with relaxed losing streak threshold
+        //random sampling with relaxed exclusivity
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             HashSet<int> selectedIndices = new();
@@ -978,7 +977,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             bool t1HasLosingStreak = t1.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
             bool t2HasLosingStreak = t2.Any(p => p.IsOnLosingStreak(p.playerData.Outcomes));
 
-            if (!t1HasLosingStreak && t2HasLosingStreak)
+            if (t2HasLosingStreak)
             {
                 if (t2Elo - t1Elo >= (losingStreakThreshold / 1.5f))
                 {
@@ -989,7 +988,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                 }
             }
 
-            if (!t2HasLosingStreak && t1HasLosingStreak)
+            if (t1HasLosingStreak)
             {
                 if (t1Elo - t2Elo >= (losingStreakThreshold / 1.5f))
                 {
@@ -1020,15 +1019,22 @@ public class SmartMatchSystemManager : MonoBehaviour
         float t1Elo = CalcTeamElo(team1);
         float t2Elo = CalcTeamElo(team2);
 
-        float losingStreakThreshold = this.losingStreakThreshold;
         if (relax)
-            losingStreakThreshold /= 1.5f;
+        {
+            if (t1HasLosingStreak && (t1Elo - t2Elo >= losingStreakThreshold))
+                return true;
+            else if (t2HasLosingStreak && (t2Elo - t1Elo >= losingStreakThreshold))
+                return true;
+        }
+        else
+        {
+            if (!t2HasLosingStreak && t1HasLosingStreak && (t1Elo - t2Elo >= losingStreakThreshold))
+                return true;
+            else if (!t1HasLosingStreak && t2HasLosingStreak && (t2Elo - t1Elo >= losingStreakThreshold))
+                return true;
+        }
 
-        if (t1HasLosingStreak && !t2HasLosingStreak && (t1Elo - t2Elo >= losingStreakThreshold))
-            return true;
-        else if (t2HasLosingStreak && !t1HasLosingStreak && (t2Elo - t1Elo >= losingStreakThreshold))
-            return true;
-        else if (!t1HasLosingStreak && !t2HasLosingStreak)
+        if (!t1HasLosingStreak && !t2HasLosingStreak)
             return Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold;
         else
             return false;

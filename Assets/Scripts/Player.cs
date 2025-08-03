@@ -102,7 +102,7 @@ public class Player
 
     public bool IsOnLosingStreak(List<int> outcomes)
     {
-        if (outcomes.Count < 5) return false;
+        if (outcomes.Count < 3) return false;
 
         int count = 0;
         for (int i = outcomes.Count - 1; i >= 0; i--)
@@ -110,7 +110,7 @@ public class Player
             if (outcomes[i] == 0)
             {
                 count++;
-                if (count >= 5)
+                if (count >= 3)
                     return true;
             }
             else break;
