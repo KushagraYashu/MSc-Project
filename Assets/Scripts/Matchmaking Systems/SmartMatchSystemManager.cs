@@ -470,6 +470,9 @@ public class SmartMatchSystemManager : MonoBehaviour
 
                 bool p1Wins = rng.NextDouble() < p1WinProb;
 
+                p1.playerData.ResetMatchData();
+                p2.playerData.ResetMatchData();
+
                 // Update rounds played
                 p1.playerData.RoundsPlayed++;
                 p2.playerData.RoundsPlayed++;
@@ -478,6 +481,9 @@ public class SmartMatchSystemManager : MonoBehaviour
                 {
                     p1.playerData.Kills++;
                     p2.playerData.Deaths++;
+
+                    p1.playerData.thisMatchKills++;
+                    p2.playerData.thisMatchDeaths++;
 
                     // Check if p1 is in a clutch
                     if (aliveTeam1.Count == 1 && aliveTeam2.Count >= 2)
@@ -500,6 +506,9 @@ public class SmartMatchSystemManager : MonoBehaviour
                 {
                     p1.playerData.Deaths++;
                     p2.playerData.Kills++;
+
+                    p1.playerData.thisMatchDeaths++;
+                    p2.playerData.thisMatchKills++;
 
                     if (aliveTeam2.Count == 1 && aliveTeam1.Count >= 2)
                     {
@@ -533,11 +542,16 @@ public class SmartMatchSystemManager : MonoBehaviour
                 {
                     team1LastAlive.playerData.Clutches++;
                     team1LastAlive.playerData.ClutchesPresented++;
+
+                    team1LastAlive.playerData.thisMatchClutches++;
+                    team1LastAlive.playerData.thisMatchClutchesPresented++;
                 }
 
-                if (team2HadClutchChance && team2LastAlive != null)
+                if (team2HadClutchChance)
                 {
                     team2LastAlive.playerData.ClutchesPresented++;
+
+                    team2LastAlive.playerData.thisMatchClutchesPresented++;
                 }
             }
             else
@@ -548,11 +562,16 @@ public class SmartMatchSystemManager : MonoBehaviour
                 {
                     team2LastAlive.playerData.Clutches++;
                     team2LastAlive.playerData.ClutchesPresented++;
+
+                    team2LastAlive.playerData.thisMatchClutches++;
+                    team2LastAlive.playerData.thisMatchClutchesPresented++;
                 }
 
-                if (team1HadClutchChance && team1LastAlive != null)
+                if (team1HadClutchChance)
                 {
                     team1LastAlive.playerData.ClutchesPresented++;
+
+                    team1LastAlive.playerData.thisMatchClutchesPresented++;
                 }
             }
 
@@ -687,7 +706,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         double delta = K * (actualResult - expectedScore);
 
-        double performance = CalculatePerformanceMultiplier(p, oldCS);
+        double performance = CalculatePerformanceMultiplier(p);
 
         p.playerData.PerformanceMultipliers.Add((float)performance);
 
@@ -715,19 +734,16 @@ public class SmartMatchSystemManager : MonoBehaviour
         //Debug.Log($"Team {team}\nPlayer {p.playerData.Id} (Pool {poolIndex}) Elo updated: {p.playerData.Elo} (Delta: {delta})");
     }
 
-    double CalculatePerformanceMultiplier(Player player, double oldCS)
+    double CalculatePerformanceMultiplier(Player player)
     {
-        double beforeMatchCS = oldCS;
-        double afterMatchCS = player.playerData.GetCompositeSkillCalculation();
+        player.playerData.CalculateMatchData();
 
-        if (beforeMatchCS == 0) return 1.0;
+        double matchPerformance = player.playerData.CalculateMatchPerformance();
 
-        double performanceRatio = afterMatchCS / beforeMatchCS;
-
-        if (performanceRatio > 2.0) return 2.5;
-        if (performanceRatio > 1.5) return 2.0;
-        if (performanceRatio > 1.2) return 1.5;
-        if (performanceRatio < 0.5) return 0.5;
+        if (matchPerformance >= 2.5) return 2.0;
+        if (matchPerformance >= 2.0) return 1.7;
+        if (matchPerformance >= 1.3) return 1.5;
+        if (matchPerformance <= 0.5) return 0.5;
         return 1.0;
     }
 

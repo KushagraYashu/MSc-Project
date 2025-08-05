@@ -31,11 +31,11 @@ public class PlayerData
 
     //composite skill
     [SerializeField] private double _compositeSkill = 0;
-    private double _We = 1.00;
-    private double _Wk = 12.500;
-    private double _Wa = 6.500;
-    private double _Wc = 8.000;
-    private double _Wx = 0.25;
+    private double _We = 01.00;
+    private double _Wk = 12.50;
+    private double _Wa = 06.50;
+    private double _Wc = 08.00;
+    private double _Wx = 00.25;
 
     //kd ratio
     private uint _kills = 0;
@@ -54,6 +54,75 @@ public class PlayerData
     [SerializeField] private uint _gamesPlayed = 0;
     private uint _roundsPlayed = 0;
     private uint _wins = 0;
+
+    //match specific data
+    public int thisMatchKills = 0;
+    public int thisMatchDeaths = 0;
+    public int thisMatchAssists = 0;
+    public int thisMatchRoundsPlayed = 0;
+    public int thisMatchClutches = 0;
+    public int thisMatchClutchesPresented = 0;
+    public float thisMatchKDR = 0;
+    public float thisMatchAssistRatio = 0;
+    public float thisMatchClutchRatio = 0;
+
+    public void ResetMatchData()
+    {
+        thisMatchKills = 0;
+        thisMatchDeaths = 0;
+        thisMatchAssists = 0;
+        thisMatchRoundsPlayed = 0;
+        thisMatchClutches = 0;
+        thisMatchClutchesPresented = 0;
+        thisMatchKDR = 0;
+        thisMatchAssistRatio = 0;
+        thisMatchClutchRatio = 0;
+    }
+
+    public void CalculateMatchData()
+    {
+        //KDR
+        if (thisMatchDeaths == 0)
+        {
+            thisMatchKDR = thisMatchKills;
+        }
+        else
+        {
+            thisMatchKDR = (float)thisMatchKills / thisMatchDeaths;
+        }
+
+        //assist ratio
+        if (thisMatchRoundsPlayed == 0)
+        {
+            thisMatchAssistRatio = 0;
+        }
+        else
+        {
+            thisMatchAssistRatio = (float)thisMatchAssists / thisMatchRoundsPlayed;
+        }
+
+        //clutch ratio
+        if (thisMatchClutchesPresented == 0)
+        {
+            thisMatchClutchRatio = 0;
+        }
+        else
+        {
+            thisMatchClutchRatio = (float)thisMatchClutches / thisMatchClutchesPresented;
+        }
+    }
+
+    public float CalculateMatchPerformance()
+    {
+        //assuming that bad players have a 0.2 KDR, 0.1 assist ratio, and 0.2 clutch ratio. The value will be 0.5. A very good player will have KDR more than 1.5, assist ratio of at least 0.5, and clutch ratio of 0.7, bringing the value to 2.7.
+        //The assists are randomly given, so take the values with a grain of salt.
+
+        return (float)(
+            thisMatchKDR +
+            thisMatchAssistRatio +
+            thisMatchClutchRatio
+        );
+    }
 
     //history
     public List<int> Outcomes = new();
@@ -235,7 +304,7 @@ public class PlayerData
             _Wk * _KDR +
             _Wa * _assistRatio +
             _Wc * _clutchRatio +
-            _Wx * _gamesPlayed;
+            Mathf.Max((float)_Wx * _gamesPlayed, 400f);
 
         _compositeSkill = newCS;
         if (outcome == 0)
@@ -261,7 +330,7 @@ public class PlayerData
             _Wk * _KDR +
             _Wa * _assistRatio +
             _Wc * _clutchRatio +
-            _Wx * _gamesPlayed
+            Mathf.Max((float)_Wx * _gamesPlayed, 400f)
         );
     }
 
@@ -275,8 +344,8 @@ public class PlayerData
             _We * _elo + 
             _Wk * _KDR + 
             _Wa * _assistRatio + 
-            _Wc * _clutchRatio + 
-            _Wx * _gamesPlayed
+            _Wc * _clutchRatio +
+            Mathf.Max((float)_Wx * _gamesPlayed, 400f)
         ;
     }
 
