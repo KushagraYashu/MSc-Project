@@ -36,6 +36,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
     [Header("Debug Info")]
     public bool logTeams = true;
+    public TMP_Text minMatchPerPlayerText;
 
     [System.Serializable]
     public class PoolPlayers
@@ -263,6 +264,8 @@ public class SmartMatchSystemManager : MonoBehaviour
                 minMatchesPlayed = Mathf.Min(minMatchesPlayed, allPlayers[i].playerData.GamesPlayed);
             }
 
+            minMatchPerPlayerText.text = minMatchesPlayed.ToString();
+
             // Checkpoint every 5 matches
             if (minMatchesPlayed > lastMSEMatchCheckpoint && minMatchesPlayed % 5 == 0)
             {
@@ -306,7 +309,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,KDA,Kills,Deaths,Clutches,Assists,CS,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
+        csvContent.AppendLine("PlayerID,KDA,Kills,Deaths,Clutches,Assists,CS,RealSkill,PMHistory,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
 
         string MSEListStr = string.Join(";", MSEs);
         string smurfListStr = string.Join(";", smurfPlayerIDs);
@@ -320,9 +323,10 @@ public class SmartMatchSystemManager : MonoBehaviour
             string CSHistoryStr = string.Join(";", player.EloHistory);
             string poolHistoryStr = string.Join(";", player.poolHistory);
             string outcomeHistoryStr = string.Join(";", player.playerData.Outcomes);
+            string PMHistoryStr = string.Join(";", player.playerData.PerformanceMultipliers);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.KDR},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.Clutches},{player.playerData.Assists},{player.playerData.CompositeSkill},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.KDR},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.Clutches},{player.playerData.Assists},{player.playerData.CompositeSkill},{player.playerData.RealSkill},\"{PMHistoryStr}\",{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -484,7 +488,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
                     aliveTeam2.Remove(p2);
 
-                    if(UnityEngine.Random.Range(0f, 1f) < 0.5f) //50% chance of assist
+                    if(UnityEngine.Random.Range(0f, 1f) <= 0.5f) //50% chance of assist
                     {
                         //randomly select a player to award assist
                         int i = UnityEngine.Random.Range(0, aliveTeam1.Count);
@@ -505,7 +509,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
                     aliveTeam1.Remove(p1);
 
-                    if (UnityEngine.Random.Range(0f, 1f) < 0.5f) //50% chance of assist
+                    if (UnityEngine.Random.Range(0f, 1f) <= 0.5f) //50% chance of assist
                     {
                         //randomly select a player to award assist
                         int i = UnityEngine.Random.Range(0, aliveTeam2.Count);
@@ -685,7 +689,9 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         double performance = CalculatePerformanceMultiplier(p, oldCS);
 
-        if(delta <= 0)
+        p.playerData.PerformanceMultipliers.Add((float)performance);
+
+        if (delta <= 0)
         {
             delta /= performance; //less impact if player performed well
         }
@@ -694,7 +700,9 @@ public class SmartMatchSystemManager : MonoBehaviour
             delta *= performance; //boost in case of good performance
         }
 
+        double oldElo = p.playerData.Elo;
         p.playerData.Elo += delta;
+        p.playerData.Elo = Mathf.Clamp((float)p.playerData.Elo, (float)oldElo - 100, (float)oldElo + 100);
 
         p.playerData.UpdateCompositeSkill((int)actualResult);
 
@@ -719,6 +727,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         if (performanceRatio > 2.0) return 2.5;
         if (performanceRatio > 1.5) return 2.0;
         if (performanceRatio > 1.2) return 1.5;
+        if (performanceRatio < 0.5) return 0.5;
         return 1.0;
     }
 
@@ -747,41 +756,37 @@ public class SmartMatchSystemManager : MonoBehaviour
         return list.OrderBy(x => rng.Next()).Take(count).ToList();
     }
 
+    int usingSorting = 0;
+    int usingRandomSampling = 0;
+
+    [Space(10)]
     bool flip = false;
     public bool TrySplitFairTeams(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
     {
         //players available for matching must be IDLE
         var idlePlayers = pool
                             .Where(p => p.playerState == Player.PlayerState.Idle)
-                            .OrderBy(p => p.playerData.CompositeSkill)
+                            .OrderBy(p => p.playerData.GamesPlayed)
+                            .ThenBy(p => p.playerData.CompositeSkill)
                             .ToList();
 
         //matching players based on sorted composite skill
         if (!flip)
         {
-            for (int i = 0; i + teamSize * 2 <= idlePlayers.Count; i += teamSize * 2)
+            for (int i = 0; i + teamSize * 2 <= idlePlayers.Count; i++)
             {
                 var batch = idlePlayers.GetRange(i, teamSize * 2);
 
-                List<Player> potentialTeam1 = new();
-                List<Player> potentialTeam2 = new();
-
-                for (int j = 0; j < teamSize * 2; j += 2)
+                var result = CheckLosingStreakBiasAndFairness(batch);
+                if (result.Bool)
                 {
-                    potentialTeam1.Add(batch[j]);
-                }
-                for (int k = 1; k < teamSize * 2; k += 2)
-                {
-                    potentialTeam2.Add(batch[k]);
-                }
-
-                // Losing streak compensation
-                if (CheckLosingStreakBiasAndFairness(potentialTeam1, potentialTeam2))
-                {
-                    team1 = potentialTeam1;
-                    team2 = potentialTeam2;
+                    team1 = result.team1;
+                    team2 = result.team2;
                     UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+
                     flip = true;
+                    usingSorting++;
+
                     return true;
                 }
             }
@@ -790,29 +795,20 @@ public class SmartMatchSystemManager : MonoBehaviour
         }
         if (flip)
         {
-            for (int i = idlePlayers.Count - teamSize * 2; i >= 0; i -= teamSize * 2)
+            for (int i = idlePlayers.Count - teamSize * 2; i >= 0; i--)
             {
                 var batch = idlePlayers.GetRange(i, teamSize * 2);
 
-                List<Player> potentialTeam1 = new();
-                List<Player> potentialTeam2 = new();
-
-                for (int j = 0; j < teamSize * 2; j += 2)
+                var result = CheckLosingStreakBiasAndFairness(batch);
+                if (result.Bool)
                 {
-                    potentialTeam1.Add(batch[j]);
-                }
-                for (int k = 1; k < teamSize * 2; k += 2)
-                {
-                    potentialTeam2.Add(batch[k]);
-                }
-
-                // Losing streak compensation
-                if (CheckLosingStreakBiasAndFairness(potentialTeam1, potentialTeam2))
-                {
-                    team1 = potentialTeam1;
-                    team2 = potentialTeam2;
+                    team1 = result.team1;
+                    team2 = result.team2;
                     UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+
                     flip = false;
+                    usingSorting++;
+
                     return true;
                 }
             }
@@ -822,7 +818,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         //sorting has failed, try random sample
         var idlePlayersShuffled = ShuffleCopy(idlePlayers);
-        int maxAttempts = idlePlayersShuffled.Count * 2;
+        int maxAttempts = idlePlayersShuffled.Count * 3;
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             HashSet<int> selectedIndices = new();
@@ -844,15 +840,15 @@ public class SmartMatchSystemManager : MonoBehaviour
                 (selectedPlayers[i], selectedPlayers[j]) = (selectedPlayers[j], selectedPlayers[i]);
             }
 
-            // Split into two teams
-            var t1 = selectedPlayers.Take(teamSize).ToList();
-            var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
-
-            if(CheckLosingStreakBiasAndFairness(t1, t2))
+            var getTeams = CheckLosingStreakBiasAndFairness(selectedPlayers);
+            if (getTeams.Bool)
             {
-                team1 = t1;
-                team2 = t2;
+                team1 = getTeams.team1;
+                team2 = getTeams.team2;
                 UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+
+                usingRandomSampling++;
+
                 return true;
             }
         }
@@ -860,40 +856,53 @@ public class SmartMatchSystemManager : MonoBehaviour
         return false;
     }
 
-    bool CheckLosingStreakBiasAndFairness(List<Player> team1, List<Player> team2)
+    (bool Bool, List<Player> team1, List<Player> team2) CheckLosingStreakBiasAndFairness(List<Player> somePlayers)
     {
-        var t1Streak = IsOnLosingStreak(team1); // returns (Bool, Count)
-        var t2Streak = IsOnLosingStreak(team2);
+        var allTeams = GenerateAllPossibleCombinations(somePlayers, teamSize);
 
-        float t1Elo = CalcTeamElo(team1);
-        float t2Elo = CalcTeamElo(team2);
+        foreach(var teamPair in allTeams)
+        {
+            var t1Streak = IsOnLosingStreak(teamPair.team1); // returns (Bool, Count)
+            var t2Streak = IsOnLosingStreak(teamPair.team2);
 
-        if (t1Streak.Bool && !t2Streak.Bool)    //only team 1 has a losing streak
-        {
-            return (t1Elo - t2Elo) >= losingStreakThreshold;
-        }
-        else if (!t1Streak.Bool && t2Streak.Bool)   //only team 2 has a losing streak
-        {
-            return (t2Elo - t1Elo) >= losingStreakThreshold;
-        }
-        else if (t1Streak.Bool && t2Streak.Bool)    //both team have losing streaks
-        {
-            if (t1Streak.Count > t2Streak.Count)    //team 1 has more players on losing streak
+            float t1Elo = CalcTeamElo(teamPair.team1);
+            float t2Elo = CalcTeamElo(teamPair.team2);
+
+            if (t1Streak.Bool && !t2Streak.Bool)    //only team 1 has a losing streak
             {
-                return (t1Elo - t2Elo) >= losingStreakThreshold;
+                if ((t1Elo - t2Elo) >= losingStreakThreshold)
+                    return (true, teamPair.team1, teamPair.team2);
             }
-            else if (t2Streak.Count > t1Streak.Count)   //team 2 has more players on losing streak
+            else if (!t1Streak.Bool && t2Streak.Bool)   //only team 2 has a losing streak
             {
-                return (t2Elo - t1Elo) >= losingStreakThreshold;
+                if ((t2Elo - t1Elo) >= losingStreakThreshold)
+                    return (true, teamPair.team1, teamPair.team2);
             }
-            else // Equal streak count
+            else if (t1Streak.Bool && t2Streak.Bool)    //both team have losing streaks
             {
-                return Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold;
+                if (t1Streak.Count > t2Streak.Count)    //team 1 has more players on losing streak
+                {
+                    if ((t1Elo - t2Elo) >= losingStreakThreshold)
+                        return (true, teamPair.team1, teamPair.team2);
+                }
+                else if (t2Streak.Count > t1Streak.Count)   //team 2 has more players on losing streak
+                {
+                    if ((t2Elo - t1Elo) >= losingStreakThreshold)
+                        return (true, teamPair.team1, teamPair.team2);
+                }
+                else // Equal streak count
+                {
+                    if (Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
+                        return (true, teamPair.team1, teamPair.team2);
+                }
             }
+
+            // Neither team has streaks
+            if (Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
+                return (true, teamPair.team1, teamPair.team2);
         }
 
-        // Neither team has streaks
-        return Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold;
+        return (false, null, null);
     }
 
 
@@ -923,6 +932,78 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         if(playersOnLosingStreak > 0) return (true, playersOnLosingStreak);
         else return (false, 0);
+    }
+
+    public struct AllTeams
+    {
+        public List<Player> team1;
+        public List<Player> team2;
+
+        public AllTeams(List<Player> t1, List<Player> t2)
+        {
+            team1 = t1;
+            team2 = t2;
+        }
+    }
+
+
+    public List<AllTeams> GenerateAllPossibleCombinations(List<Player> somePlayers, int teamSize)
+    {
+        if (somePlayers.Count < teamSize * 2)
+            throw new ArgumentException($"List size must be more than {teamSize * 2}");
+
+        var results = new List<AllTeams>();
+        var uniquePairs = new HashSet<string>();
+
+        foreach (var team1 in GetCombinations(somePlayers, teamSize))
+        {
+            var team2Candidates = somePlayers.Except(team1).ToList();
+
+            if (team2Candidates.Count >= teamSize)
+            {
+                foreach (var team2 in GetCombinations(team2Candidates, teamSize))
+                {
+                    // Create a canonical key using sorted IDs
+                    var t1Ids = team1.Select(p => p.playerData.Id).OrderBy(id => id);
+                    var t2Ids = team2.Select(p => p.playerData.Id).OrderBy(id => id);
+
+                    string team1Key = string.Join(",", t1Ids);
+                    string team2Key = string.Join(",", t2Ids);
+
+                    // Sort both team keys to ensure mirror pairs are treated the same
+                    var key = string.Compare(team1Key, team2Key) < 0 ?
+                              $"{team1Key}|{team2Key}" :
+                              $"{team2Key}|{team1Key}";
+
+                    if (!uniquePairs.Contains(key))
+                    {
+                        uniquePairs.Add(key);
+                        results.Add(new AllTeams(new List<Player>(team1), new List<Player>(team2)));
+                    }
+                }
+            }
+        }
+
+        return results;
+    }
+
+    // Helper function for combinations
+    IEnumerable<List<T>> GetCombinations<T>(List<T> list, int k, int start = 0)
+    {
+        if (k == 0)
+        {
+            yield return new List<T>();
+        }
+        else
+        {
+            for (int i = start; i <= list.Count - k; i++)
+            {
+                foreach (var tail in GetCombinations(list, k - 1, i + 1))
+                {
+                    yield return new List<T> { list[i] }.Concat(tail).ToList();
+                }
+            }
+        }
     }
 
 

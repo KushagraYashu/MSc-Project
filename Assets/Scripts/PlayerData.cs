@@ -33,8 +33,8 @@ public class PlayerData
     [SerializeField] private double _compositeSkill = 0;
     private double _We = 1.00;
     private double _Wk = 12.500;
-    private double _Wa = 5.000;
-    private double _Wc = 7.000;
+    private double _Wa = 6.500;
+    private double _Wc = 8.000;
     private double _Wx = 0.25;
 
     //kd ratio
@@ -57,6 +57,7 @@ public class PlayerData
 
     //history
     public List<int> Outcomes = new();
+    public List<float> PerformanceMultipliers = new();
 
     //matching threshold
     private double _matchingThreshold = 0;
@@ -227,6 +228,7 @@ public class PlayerData
 
         UpdateAssistRatio();
         UpdateClutchRatio();
+        UpdateKDR();
 
         var newCS =
             _We * _elo +
@@ -235,20 +237,25 @@ public class PlayerData
             _Wc * _clutchRatio +
             _Wx * _gamesPlayed;
 
+        _compositeSkill = newCS;
         if (outcome == 0)
         {
             //making sure composite skill always decreases (by at least 2) in a loss
-            _compositeSkill = Mathf.Min((float)(curCS - 2), (float)newCS);
+            _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS - 100, (float)curCS - 2);
         }
         else
         {
-            //limiting the composite skill increase to 100 (a player will require at least 4 games to rank up from a pool)
-            _compositeSkill = Mathf.Min((float)newCS, (float)(curCS + 100));
+            //limiting the composite skill increase to 100 and a minimum of 2 (a player will require at least 4 games to rank up from a pool)
+            _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS + 2, (float)curCS + 100);
         }
     }
 
     public float GetCompositeSkillCalculation()
     {
+        UpdateKDR();
+        UpdateAssistRatio();
+        UpdateClutchRatio();
+
         return (float)(
             _We * _elo +
             _Wk * _KDR +
@@ -262,6 +269,7 @@ public class PlayerData
     {
         UpdateAssistRatio();
         UpdateClutchRatio();
+        UpdateKDR();
 
         _compositeSkill = 
             _We * _elo + 
