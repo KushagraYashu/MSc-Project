@@ -154,7 +154,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             {
                 Player newPlayer = new();
 
-                float elo = minElo;
+                float elo = minElo + (maxElo - minElo)/2;
                 float realSkill = 0;
                 int ID = MainServer.instance.GenerateRandomID(maxAttempts, maxIDs);
 
@@ -446,6 +446,15 @@ public class SmartMatchSystemManager : MonoBehaviour
         int team1RoundWins = 0;
         int team2RoundWins = 0;
 
+        foreach(var p in team1)
+        {
+            p.playerData.ResetMatchData();
+        }
+        foreach(var p in team2)
+        {
+            p.playerData.ResetMatchData();
+        }
+
         for (int round = 0; round < maxRoundsPerMatch; round++)
         {
             List<Player> team1Shuffled = ShuffleCopy(team1);
@@ -469,9 +478,6 @@ public class SmartMatchSystemManager : MonoBehaviour
                 double p1WinProb = 1.0 / (1.0 + Math.Pow(10, (p2.playerData.RealSkill - p1.playerData.RealSkill) / 400.0));
 
                 bool p1Wins = rng.NextDouble() < p1WinProb;
-
-                p1.playerData.ResetMatchData();
-                p2.playerData.ResetMatchData();
 
                 // Update rounds played
                 p1.playerData.RoundsPlayed++;
@@ -547,7 +553,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                     team1LastAlive.playerData.thisMatchClutchesPresented++;
                 }
 
-                if (team2HadClutchChance)
+                if (team2HadClutchChance && team2LastAlive != null)
                 {
                     team2LastAlive.playerData.ClutchesPresented++;
 
@@ -567,7 +573,7 @@ public class SmartMatchSystemManager : MonoBehaviour
                     team2LastAlive.playerData.thisMatchClutchesPresented++;
                 }
 
-                if (team1HadClutchChance)
+                if (team1HadClutchChance && team1LastAlive != null)
                 {
                     team1LastAlive.playerData.ClutchesPresented++;
 
@@ -682,8 +688,8 @@ public class SmartMatchSystemManager : MonoBehaviour
         expectedScore /= otherTeam.Count;
 
         int K;
-        //K value according to FIDE (Federation Internationale des Echecs or World Chess Federation)
-        if (p.playerData.GamesPlayed <= 30)
+        //K value inspired by FIDE (Federation Internationale des Echecs or World Chess Federation) regulations
+        if (p.playerData.GamesPlayed <= 30 && p.playerData.Pool < 2)
             K = 40;
         else
         {
@@ -720,8 +726,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         }
 
         double oldElo = p.playerData.Elo;
-        p.playerData.Elo += delta;
-        p.playerData.Elo = Mathf.Clamp((float)p.playerData.Elo, (float)oldElo - 100, (float)oldElo + 100);
+        p.playerData.Elo = Mathf.Clamp((float)(oldElo + delta), (float)oldElo - 100, (float)oldElo + 100);
 
         p.playerData.UpdateCompositeSkill((int)actualResult);
 
@@ -740,10 +745,10 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         double matchPerformance = player.playerData.CalculateMatchPerformance();
 
-        if (matchPerformance >= 2.5) return 2.0;
-        if (matchPerformance >= 2.0) return 1.7;
-        if (matchPerformance >= 1.3) return 1.5;
-        if (matchPerformance <= 0.5) return 0.5;
+        if (matchPerformance > 2.5) return 2.0;
+        if (matchPerformance > 2.0) return 1.7;
+        if (matchPerformance > 1.2) return 1.5;
+        if (matchPerformance < 0.5) return 0.8;
         return 1.0;
     }
 

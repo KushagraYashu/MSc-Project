@@ -35,7 +35,7 @@ public class PlayerData
     private double _Wk = 12.50;
     private double _Wa = 06.50;
     private double _Wc = 08.00;
-    private double _Wx = 00.25;
+    private double _Wx = 01.00;
 
     //kd ratio
     private uint _kills = 0;
@@ -114,7 +114,7 @@ public class PlayerData
 
     public float CalculateMatchPerformance()
     {
-        //assuming that bad players have a 0.2 KDR, 0.1 assist ratio, and 0.2 clutch ratio. The value will be 0.5. A very good player will have KDR more than 1.5, assist ratio of at least 0.5, and clutch ratio of 0.7, bringing the value to 2.7.
+        //assuming that bad players have a 0.02 KDR, 0.01 assist ratio, and 0.01 clutch ratio. The value will be 0.04. A very good player will have KDR more than 1.5, assist ratio of at least 0.5, and clutch ratio of 0.7, bringing the value to 2.7.
         //The assists are randomly given, so take the values with a grain of salt.
 
         return (float)(
@@ -304,7 +304,7 @@ public class PlayerData
             _Wk * _KDR +
             _Wa * _assistRatio +
             _Wc * _clutchRatio +
-            Mathf.Max((float)_Wx * _gamesPlayed, 400f);
+            Mathf.Min((float)_Wx * _gamesPlayed, 500f);
 
         _compositeSkill = newCS;
         if (outcome == 0)
@@ -317,6 +317,8 @@ public class PlayerData
             //limiting the composite skill increase to 100 and a minimum of 2 (a player will require at least 4 games to rank up from a pool)
             _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS + 2, (float)curCS + 100);
         }
+
+        _compositeSkill = Mathf.Max((float)_compositeSkill, 700f);
     }
 
     public float GetCompositeSkillCalculation()
@@ -330,7 +332,7 @@ public class PlayerData
             _Wk * _KDR +
             _Wa * _assistRatio +
             _Wc * _clutchRatio +
-            Mathf.Max((float)_Wx * _gamesPlayed, 400f)
+            Mathf.Min((float)_Wx * _gamesPlayed, 500f)
         );
     }
 
@@ -345,8 +347,10 @@ public class PlayerData
             _Wk * _KDR + 
             _Wa * _assistRatio + 
             _Wc * _clutchRatio +
-            Mathf.Max((float)_Wx * _gamesPlayed, 400f)
+            Mathf.Min((float)_Wx * _gamesPlayed, 500f)
         ;
+
+        _compositeSkill = Mathf.Max((float)_compositeSkill, 700f);
     }
 
 
