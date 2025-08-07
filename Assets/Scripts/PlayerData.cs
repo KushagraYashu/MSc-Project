@@ -1,9 +1,10 @@
-using UnityEngine;
-using UnityEditor.ShaderGraph.Internal;
 using Moserware.Skills;
-using TrueSkill2;
 using NUnit.Framework;
 using System.Collections.Generic;
+using TrueSkill2;
+using UnityEditor.ShaderGraph.Internal;
+using UnityEngine;
+using static UnityEditor.PlayerSettings;
 
 [System.Serializable]
 public class PlayerData
@@ -23,19 +24,16 @@ public class PlayerData
     //vanilla trueskill (moserware)
     [SerializeField] private Moserware.Skills.Rating _trueSkillRating = GameInfo.DefaultGameInfo.DefaultRating;
 
-    //my trueskill
-    [SerializeField] private TrueSkill2.Rating _myTrueSkillRating = new();
-
     //pool
     [SerializeField] private int _pool = 0;
 
     //composite skill
     [SerializeField] private double _compositeSkill = 0;
     private double _We = 01.00;
-    private double _Wk = 12.50;
-    private double _Wa = 06.50;
-    private double _Wc = 08.00;
-    private double _Wx = 01.00;
+    private double _Wk = 10.00;
+    private double _Wa = 04.00;
+    private double _Wc = 07.00;
+    private double _Wx = 00.25;
 
     //kd ratio
     private uint _kills = 0;
@@ -66,64 +64,6 @@ public class PlayerData
     public float thisMatchAssistRatio = 0;
     public float thisMatchClutchRatio = 0;
 
-    public void ResetMatchData()
-    {
-        thisMatchKills = 0;
-        thisMatchDeaths = 0;
-        thisMatchAssists = 0;
-        thisMatchRoundsPlayed = 0;
-        thisMatchClutches = 0;
-        thisMatchClutchesPresented = 0;
-        thisMatchKDR = 0;
-        thisMatchAssistRatio = 0;
-        thisMatchClutchRatio = 0;
-    }
-
-    public void CalculateMatchData()
-    {
-        //KDR
-        if (thisMatchDeaths == 0)
-        {
-            thisMatchKDR = thisMatchKills;
-        }
-        else
-        {
-            thisMatchKDR = (float)thisMatchKills / thisMatchDeaths;
-        }
-
-        //assist ratio
-        if (thisMatchRoundsPlayed == 0)
-        {
-            thisMatchAssistRatio = 0;
-        }
-        else
-        {
-            thisMatchAssistRatio = (float)thisMatchAssists / thisMatchRoundsPlayed;
-        }
-
-        //clutch ratio
-        if (thisMatchClutchesPresented == 0)
-        {
-            thisMatchClutchRatio = 0;
-        }
-        else
-        {
-            thisMatchClutchRatio = (float)thisMatchClutches / thisMatchClutchesPresented;
-        }
-    }
-
-    public float CalculateMatchPerformance()
-    {
-        //assuming that bad players have a 0.02 KDR, 0.01 assist ratio, and 0.01 clutch ratio. The value will be 0.04. A very good player will have KDR more than 1.5, assist ratio of at least 0.5, and clutch ratio of 0.7, bringing the value to 2.7.
-        //The assists are randomly given, so take the values with a grain of salt.
-
-        return (float)(
-            thisMatchKDR +
-            thisMatchAssistRatio +
-            thisMatchClutchRatio
-        );
-    }
-
     //history
     public List<int> Outcomes = new();
     public List<float> PerformanceMultipliers = new();
@@ -133,14 +73,7 @@ public class PlayerData
 
     [SerializeField] private bool _wantToPlay = false;
 
-    public void SetPlayerData(int id, double baseElo, double realSkill, int pool, double matchingThreshold)
-    {
-        _id = id;
-        _elo = baseElo;
-        _realSkill = realSkill;
-        _matchingThreshold = matchingThreshold;
-        _pool = pool;
-    }
+    
 
     //getters and setters
     public int Id
@@ -173,12 +106,6 @@ public class PlayerData
         set { _trueSkillRating = value; }
     }
     
-    public TrueSkill2.Rating MyTrueSkillRating
-    {
-        get { return _myTrueSkillRating; }
-        set { _myTrueSkillRating = value; }
-    }
-
     public int Pool
     {
         get { return _pool; }
@@ -255,6 +182,50 @@ public class PlayerData
         set { _wins = (uint)value; }
     }
 
+    //Elo
+    public void SetPlayerData(int id, double baseElo, double realSkill, int pool, int matchesToPlay)
+    {
+        _id = id;
+        _elo = baseElo;
+        _realSkill = realSkill;
+        _pool = pool;
+        _matchesToPlay = (uint)matchesToPlay;
+    }
+    //Glicko
+    public void SetPlayerData(int id, double baseElo, float RD, double realSkill, int pool, int matchesToPlay)
+    {
+        _id = id;
+        _elo = baseElo;
+        _rd = RD;
+        _realSkill = realSkill;
+        _pool = pool;
+        _matchesToPlay = (uint)matchesToPlay;
+    }
+    //Smart System
+    public void SetPlayerData(int id, double baseElo, double realSkill, int pool, int matchesToPlay, bool smartSys)
+    {
+        _id = id;
+        _elo = baseElo;
+        _rd = RD;
+        _realSkill = realSkill;
+        _pool = pool;
+        _matchesToPlay = (uint)matchesToPlay;
+
+        if (smartSys) CalculateAndAssignCompositeSkill();
+    }
+    //TrueSkill
+    public void SetPlayerData(int id, double baseElo, double realSkill, float trueskillRating, int pool, int matchesToPlay)
+    {
+        _id = id;
+        _elo = baseElo;
+        _rd = RD;
+        _realSkill = realSkill;
+        _pool = pool;
+        _matchesToPlay = (uint)matchesToPlay;
+
+        _trueSkillRating = new(trueskillRating, GameInfo.DefaultInitialStdDev);
+    }
+
     public void UpdateKDR()
     {
         if (_deaths == 0)
@@ -291,8 +262,14 @@ public class PlayerData
         }
     }
 
-    public void UpdateCompositeSkill(int outcome)
+    public void UpdateCompositeSkillAndElo(double delta, int outcome)
     {
+        var minElo = CentralProperties.instance.eloRangePerPool[0].x;
+        var maxElo = CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools].y;
+
+        var curElo = _elo;
+        _elo = Mathf.Clamp((float)(curElo + delta), minElo, maxElo);
+
         var curCS = _compositeSkill;
 
         UpdateAssistRatio();
@@ -304,7 +281,7 @@ public class PlayerData
             _Wk * _KDR +
             _Wa * _assistRatio +
             _Wc * _clutchRatio +
-            Mathf.Min((float)_Wx * _gamesPlayed, 500f);
+            Mathf.Min((float)_Wx * _gamesPlayed, 200f);
 
         _compositeSkill = newCS;
         if (outcome == 0)
@@ -318,7 +295,7 @@ public class PlayerData
             _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS + 2, (float)curCS + 100);
         }
 
-        _compositeSkill = Mathf.Max((float)_compositeSkill, 700f);
+        _compositeSkill = Mathf.Clamp((float)_compositeSkill, minElo, maxElo);
     }
 
     public float GetCompositeSkillCalculation()
@@ -332,7 +309,7 @@ public class PlayerData
             _Wk * _KDR +
             _Wa * _assistRatio +
             _Wc * _clutchRatio +
-            Mathf.Min((float)_Wx * _gamesPlayed, 500f)
+            Mathf.Min((float)_Wx * _gamesPlayed, 200f)
         );
     }
 
@@ -347,47 +324,87 @@ public class PlayerData
             _Wk * _KDR + 
             _Wa * _assistRatio + 
             _Wc * _clutchRatio +
-            Mathf.Min((float)_Wx * _gamesPlayed, 500f)
+            Mathf.Min((float)_Wx * _gamesPlayed, 200f)
         ;
-
-        _compositeSkill = Mathf.Max((float)_compositeSkill, 700f);
     }
 
-
-
-    public float TrueSkillScaled(float minGlobal, float maxGlobal)
+    public void ResetMatchData()
     {
-        double conservative = _trueSkillRating.ConservativeRating;
-        double normalised = (conservative - 0) / 50;
-        double scaled = minGlobal + normalised * (maxGlobal - minGlobal);
-
-        return (float)scaled;
+        thisMatchKills = 0;
+        thisMatchDeaths = 0;
+        thisMatchAssists = 0;
+        thisMatchRoundsPlayed = 0;
+        thisMatchClutches = 0;
+        thisMatchClutchesPresented = 0;
+        thisMatchKDR = 0;
+        thisMatchAssistRatio = 0;
+        thisMatchClutchRatio = 0;
     }
 
-
-    const double defaultMu = 25;
-    const double defaultSigma = 8.33333333; // mu / 3
-    const double defaultConservativeRange = 50; //(0 to 50)
-    public void ConvertToTrueSkill(
-        float playerRating,
-        float minPool,
-        float maxPool,
-        float minGlobal,
-        float maxGlobal)
+    public void CalculateMatchData()
     {
-        // 1. Normalize player rating to 0-1 range within pool
-        double normalisedPoolRating = (playerRating - minPool) / (maxPool - minPool);
+        //KDR
+        if (thisMatchDeaths == 0)
+        {
+            thisMatchKDR = thisMatchKills;
+        }
+        else
+        {
+            thisMatchKDR = (float)thisMatchKills / thisMatchDeaths;
+        }
 
-        // 2. Scale to global range (optional - only needed if pools are uneven)
-        double normalisedGlobalRating = (minPool - minGlobal + (playerRating - minPool)) / (maxGlobal - minGlobal);
+        //assist ratio
+        if (thisMatchRoundsPlayed == 0)
+        {
+            thisMatchAssistRatio = 0;
+        }
+        else
+        {
+            thisMatchAssistRatio = (float)thisMatchAssists / thisMatchRoundsPlayed;
+        }
 
-        // 3. Calculate target conservative rating (0-50)
-        double targetConservative = normalisedGlobalRating * defaultConservativeRange;
+        //clutch ratio
+        if (thisMatchClutchesPresented == 0)
+        {
+            thisMatchClutchRatio = 0;
+        }
+        else
+        {
+            thisMatchClutchRatio = (float)thisMatchClutches / thisMatchClutchesPresented;
+        }
+    }
 
-        // 4. Solve for mu that satisfies: mu - 3sigma = targetConservative
-        // Using default sigma for new players
-        double targetMu = targetConservative + 3 * defaultSigma;
+    public float CalculateMatchPerformance()
+    {
+        //assuming that bad players have a 0.02 KDR, 0.01 assist ratio, and 0.01 clutch ratio. The value will be 0.04. A very good player will have KDR more than 1.5, assist ratio of at least 0.5, and clutch ratio of 0.7, bringing the value to 2.7.
+        //The assists are randomly given, so take the values with a grain of salt.
 
-        _trueSkillRating = new Moserware.Skills.Rating(targetMu, defaultSigma);
+        return (float)(
+            thisMatchKDR +
+            thisMatchAssistRatio +
+            thisMatchClutchRatio
+        );
+    }
+
+    public enum RatingConversion
+    {
+        None,
+        To_TrueSkill,
+        To_MyRating,
+    }
+
+    public float ConvertRating(float rating, float min, float max, RatingConversion conversionType, bool conservative = false)
+    {
+        float trueSkillMin = 0f;
+        float trueSkillMax = 50f;
+
+        if (conversionType == RatingConversion.To_TrueSkill)
+            return trueSkillMin + ((rating - min) / (max - min)) * (trueSkillMax - trueSkillMin);
+        else if (conversionType == RatingConversion.To_MyRating && !conservative)
+            return min + (((float)_trueSkillRating.Mean - trueSkillMin) / (trueSkillMin - trueSkillMax)) * (max - min);
+        else if(conversionType == RatingConversion.To_MyRating && conservative)
+            return min + (((float)_trueSkillRating.ConservativeRating - trueSkillMin) / (trueSkillMin - trueSkillMax)) * (max - min);
+        else
+            return -1;
     }
 }

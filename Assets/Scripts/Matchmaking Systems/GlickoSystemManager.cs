@@ -158,13 +158,12 @@ public class GlickoSystemManager : MonoBehaviour
 
                 newPlayer.SetPlayer(ID,
                                     elo,
+                                    200f,   //RD
                                     realSkill,
                                     i,
-                                    eloThreshold,
+                                    MPP,
                                     Player.PlayerState.Idle
                                     );
-
-                newPlayer.playerData.MatchesToPlay = MPP;
 
                 newPlayer.playerData.RD = 200f;
 

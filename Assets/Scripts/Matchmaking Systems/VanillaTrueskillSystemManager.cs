@@ -169,21 +169,15 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
                     realSkill = GenerateNormallyDistributedRealSkill(minEloGlobal, maxEloGlobal);
                 }
 
-                newPlayer.SetPlayer(ID,
-                                    0,
-                                    realSkill,
-                                    i,
-                                    eloThreshold,
-                                    Player.PlayerState.Idle
-                                    );
+                newPlayer.SetPlayer(ID, rating, realSkill, 
+                                        trueSkillRating: 
+                                            newPlayer.playerData.ConvertRating(rating, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_TrueSkill),
+                                    i, MPP, Player.PlayerState.Idle);
 
-                newPlayer.playerData.MatchesToPlay = MPP;
-
-                newPlayer.playerData.ConvertToTrueSkill(rating, minElo, maxElo, minEloGlobal, maxEloGlobal);
                 newPlayer.muHistory.Add(newPlayer.playerData.TrueSkillRating.Mean);
                 newPlayer.sigmaHistory.Add(newPlayer.playerData.TrueSkillRating.StandardDeviation);
                 newPlayer.conservativeValHistory.Add(newPlayer.playerData.TrueSkillRating.ConservativeRating);
-                newPlayer.scaledRatingHistory.Add(newPlayer.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal));
+                newPlayer.scaledRatingHistory.Add(newPlayer.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating));
 
                 newPlayer.poolHistory.Add(i);
 
@@ -219,7 +213,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             var pool = poolPlayersList[i].playersInPool;
             for (int j = 0; j < pool.Count; j++)
             {
-                float elo = (float)pool[j].playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal);
+                float elo = (float)pool[j].playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating, conservative: true);
                 float realSkill = (float)pool[j].playerData.RealSkill;
                 float error = elo - realSkill;
 
@@ -323,7 +317,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             string poolHistoryStr = string.Join(";", player.poolHistory);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.TrueSkillRating.ConservativeRating},{player.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal)},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{muHistoryStr}\",\"{sigmaHistoryStr}\",\"{conservativeRatingHistoryStr}\",\"{scaledRatingHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.TrueSkillRating.ConservativeRating},{player.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating)},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{muHistoryStr}\",\"{sigmaHistoryStr}\",\"{conservativeRatingHistoryStr}\",\"{scaledRatingHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -541,7 +535,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     void CheckRankDerank(Player p)
     {
         int currentPool = p.playerData.Pool;
-        double elo = p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal);
+        double elo = p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating);
 
         int newPool = -1;
         var cp = CentralProperties.instance;
@@ -638,7 +632,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             p.muHistory.Add(p.playerData.TrueSkillRating.Mean);
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
             p.conservativeValHistory.Add(p.playerData.TrueSkillRating.ConservativeRating);
-            p.scaledRatingHistory.Add(p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal));
+            p.scaledRatingHistory.Add(p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating));
 
             UIManager.instance.UpdateBoxContent(p);
 
@@ -651,7 +645,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             p.muHistory.Add(p.playerData.TrueSkillRating.Mean);
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
             p.conservativeValHistory.Add(p.playerData.TrueSkillRating.ConservativeRating);
-            p.scaledRatingHistory.Add(p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal));
+            p.scaledRatingHistory.Add(p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating));
 
             UIManager.instance.UpdateBoxContent(p);
 
@@ -703,14 +697,14 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             float avgElo1 = 0;
             for (int i = 0; i < t1.Count; i++)
             {
-                avgElo1 += (float)t1[i].playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal);
+                avgElo1 += (float)t1[i].playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating);
             }
             avgElo1 /= t1.Count;
 
             float avgElo2 = 0;
             for (int i = 0; i < t2.Count; i++)
             {
-                avgElo2 += (float)t2[i].playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal);
+                avgElo2 += (float)t2[i].playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating);
             }
             avgElo2 /= t2.Count;
 
@@ -724,8 +718,8 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
                 if (logTeams)
                 {
                     Debug.Log($"Fair match found! Elo diff: {Mathf.Abs(avgElo1 - avgElo2)}");
-                    Debug.Log("Team 1: Elo: " + avgElo1 + "\n" + string.Join(", ", team1.Select(p => $"{p.playerData.Id} ({p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal)})")));
-                    Debug.Log("Team 2: Elo: " + avgElo2 + "\n" + string.Join(", ", team2.Select(p => $"{p.playerData.Id} ({p.playerData.TrueSkillScaled(minEloGlobal, maxEloGlobal)})")));
+                    Debug.Log("Team 1: Elo: " + avgElo1 + "\n" + string.Join(", ", team1.Select(p => $"{p.playerData.Id} ({p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating)})")));
+                    Debug.Log("Team 2: Elo: " + avgElo2 + "\n" + string.Join(", ", team2.Select(p => $"{p.playerData.Id} ({p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating)})")));
                 }
 
                 return true;

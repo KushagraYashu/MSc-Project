@@ -154,7 +154,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             {
                 Player newPlayer = new();
 
-                float elo = minElo + (maxElo - minElo)/2;
+                float elo = minElo + 50;
                 float realSkill = 0;
                 int ID = MainServer.instance.GenerateRandomID(maxAttempts, maxIDs);
 
@@ -175,14 +175,13 @@ public class SmartMatchSystemManager : MonoBehaviour
                                     elo,
                                     realSkill,
                                     i,
-                                    matchingThreshold,
-                                    Player.PlayerState.Idle);
+                                    MPP,
+                                    Player.PlayerState.Idle,
+                                    true);
 
                 if (i == 0)
                     newPlayer.playerPlayStyles.Add(Player.PlayerPlayStyle.Basic);
 
-                newPlayer.playerData.CalculateAndAssignCompositeSkill();
-                newPlayer.playerData.MatchesToPlay = MPP;
                 newPlayer.EloHistory.Add((float)newPlayer.playerData.CompositeSkill);
                 newPlayer.poolHistory.Add(i);
 
@@ -253,10 +252,25 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         while (totalRemainingPlayers > 0)
         {
-            int randomPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
+            int randomPool = -1;
+            int maxTries = 1000;
 
-            StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
-            totalMatchesSimulated++;
+            for (int attempts = 0; attempts < maxTries; attempts++)
+            {
+                int tryPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
+
+                if (poolPlayersList[tryPool].playersInPool.Any(p => p.playerData.MatchesToPlay > 0))
+                {
+                    randomPool = tryPool;
+                    break;
+                }
+            }
+
+            if (randomPool != -1)
+            {
+                StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
+                totalMatchesSimulated++;
+            }
 
             int minMatchesPlayed = int.MaxValue;
             for (int i = 0; i < allPlayers.Count; i++)
@@ -725,10 +739,8 @@ public class SmartMatchSystemManager : MonoBehaviour
             delta *= performance; //boost in case of good performance
         }
 
-        double oldElo = p.playerData.Elo;
-        p.playerData.Elo = Mathf.Clamp((float)(oldElo + delta), (float)oldElo - 100, (float)oldElo + 100);
 
-        p.playerData.UpdateCompositeSkill((int)actualResult);
+        p.playerData.UpdateCompositeSkillAndElo(delta, (int)actualResult);
 
         p.EloHistory.Add((float)p.playerData.CompositeSkill);
         p.totalChangeFromStart += (float)(p.playerData.CompositeSkill - oldCS);
@@ -747,7 +759,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         if (matchPerformance > 2.5) return 2.0;
         if (matchPerformance > 2.0) return 1.7;
-        if (matchPerformance > 1.2) return 1.5;
+        if (matchPerformance > 1.5) return 1.5;
         if (matchPerformance < 0.5) return 0.8;
         return 1.0;
     }
@@ -786,7 +798,7 @@ public class SmartMatchSystemManager : MonoBehaviour
     {
         //players available for matching must be IDLE
         var idlePlayers = pool
-                            .Where(p => p.playerState == Player.PlayerState.Idle)
+                            .Where(p => p.playerState == Player.PlayerState.Idle && p.playerData.GamesPlayed < totalMatches * 5)
                             .OrderBy(p => p.playerData.GamesPlayed)
                             .ThenBy(p => p.playerData.CompositeSkill)
                             .ToList();

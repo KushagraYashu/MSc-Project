@@ -72,7 +72,9 @@ public class Player
     public PlayerData playerData;
 
     //Constructor
-    public void SetPlayer(int id, double baseElo, double realSkill,int pool, double matchingThreshold, PlayerState state)
+
+    //Elo
+    public void SetPlayer(int id, double baseElo, double realSkill, int pool, int matchesToPlay, PlayerState state)
     {
         playerState = state;
         if (playerType == PlayerType.TOTAL)
@@ -86,7 +88,64 @@ public class Player
 
         //initialising player data
         playerData ??= new();
-        playerData.SetPlayerData(id, baseElo, realSkill, pool, matchingThreshold);
+        playerData.SetPlayerData(id, baseElo, realSkill, pool, matchesToPlay);
+
+        //UpdateCanvas();
+    }
+    //Glicko
+    public void SetPlayer(int id, double baseElo, float RD, double realSkill, int pool, int matchesToPlay, PlayerState state)
+    {
+        playerState = state;
+        if (playerType == PlayerType.TOTAL)
+        {
+            if (pool > 0)
+                playerType = PlayerType.Experienced;
+            else
+                playerType = PlayerType.Newbie;
+        }
+        //playerMesh.GetComponent<MeshRenderer>().material = playerMaterialsBasedOnState[(int)state];
+
+        //initialising player data
+        playerData ??= new();
+        playerData.SetPlayerData(id, baseElo, RD, realSkill, pool, matchesToPlay);
+
+        //UpdateCanvas();
+    }
+    //Smart System
+    public void SetPlayer(int id, double baseElo, double realSkill, int pool, int matchesToPlay, PlayerState state, bool smartSys)
+    {
+        playerState = state;
+        if (playerType == PlayerType.TOTAL)
+        {
+            if (pool > 0)
+                playerType = PlayerType.Experienced;
+            else
+                playerType = PlayerType.Newbie;
+        }
+        //playerMesh.GetComponent<MeshRenderer>().material = playerMaterialsBasedOnState[(int)state];
+
+        //initialising player data
+        playerData ??= new();
+        playerData.SetPlayerData(id, baseElo, realSkill, pool, matchesToPlay, smartSys);
+
+        //UpdateCanvas();
+    }
+    //TrueSkill
+    public void SetPlayer(int id, double baseElo, double realSkill, float trueSkillRating, int pool, int matchesToPlay, PlayerState state)
+    {
+        playerState = state;
+        if (playerType == PlayerType.TOTAL)
+        {
+            if (pool > 0)
+                playerType = PlayerType.Experienced;
+            else
+                playerType = PlayerType.Newbie;
+        }
+        //playerMesh.GetComponent<MeshRenderer>().material = playerMaterialsBasedOnState[(int)state];
+
+        //initialising player data
+        playerData ??= new();
+        playerData.SetPlayerData(id, baseElo, realSkill, trueSkillRating, pool, matchesToPlay);
 
         //UpdateCanvas();
     }

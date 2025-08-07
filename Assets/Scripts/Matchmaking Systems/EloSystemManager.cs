@@ -160,11 +160,10 @@ public class EloSystemManager : MonoBehaviour
                                     elo,
                                     realSkill,
                                     i,
-                                    eloThreshold,
+                                    MPP,
                                     Player.PlayerState.Idle
                                     );
 
-                newPlayer.playerData.MatchesToPlay = MPP;
                 newPlayer.EloHistory.Add((float)newPlayer.playerData.Elo);
                 newPlayer.poolHistory.Add(i);
 

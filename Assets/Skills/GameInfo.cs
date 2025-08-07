@@ -11,6 +11,11 @@
         private const double DefaultInitialMean = 25.0;
         private const double DefaultInitialStandardDeviation = DefaultInitialMean/3.0;
 
+        public static double DefaultInitialStdDev
+        {
+            get { return DefaultInitialStandardDeviation; }
+        }
+
         public GameInfo(double initialMean, double initialStandardDeviation, double beta, double dynamicFactor,
                         double drawProbability)
         {
