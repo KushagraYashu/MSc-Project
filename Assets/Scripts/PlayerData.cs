@@ -1,7 +1,6 @@
 using Moserware.Skills;
 using NUnit.Framework;
 using System.Collections.Generic;
-using TrueSkill2;
 using UnityEditor.ShaderGraph.Internal;
 using UnityEngine;
 using static UnityEditor.PlayerSettings;
@@ -34,6 +33,9 @@ public class PlayerData
     private double _Wa = 04.00;
     private double _Wc = 07.00;
     private double _Wx = 00.25;
+    private bool _limitExpPoints = true;
+    private double _maxExpPoints = 200;
+    private bool _limitCompositeSkill = true;
 
     //kd ratio
     private uint _kills = 0;
@@ -211,7 +213,23 @@ public class PlayerData
         _pool = pool;
         _matchesToPlay = (uint)matchesToPlay;
 
-        if (smartSys) CalculateAndAssignCompositeSkill();
+        if (smartSys)
+        {
+            var weights = UIManager.instance.Weights;
+            _We = weights.We;
+            _Wa = weights.Wa;
+            _Wk = weights.Wk;
+            _Wc = weights.Wc;
+            _Wx = weights.Wx;
+
+            var expSettings = UIManager.instance.ExpSettings;
+            _limitExpPoints = expSettings.LimitExp;
+            _maxExpPoints = expSettings.MaxExpPoints;
+
+            _limitCompositeSkill = UIManager.instance.LimitRatingPoints;
+
+            CalculateAndAssignCompositeSkill();
+        }
     }
     //TrueSkill
     public void SetPlayerData(int id, double baseElo, double realSkill, float trueskillRating, int pool, int matchesToPlay)
@@ -265,29 +283,34 @@ public class PlayerData
     public void UpdateCompositeSkillAndElo(double delta, int outcome)
     {
         var minElo = CentralProperties.instance.eloRangePerPool[0].x;
-        var maxElo = CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools].y;
+        var maxElo = CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y;
 
-        var curElo = _elo;
-        _elo = Mathf.Clamp((float)(curElo + delta), minElo, maxElo);
-
-        var curCS = _compositeSkill;
+        //Elo update
+        if (_limitCompositeSkill)
+            _elo = Mathf.Clamp((float)_elo + (float)delta, minElo, maxElo);
+        else
+            _elo += delta;
 
         UpdateAssistRatio();
         UpdateClutchRatio();
         UpdateKDR();
 
+        //CS update
+        var curCS = _compositeSkill;
         var newCS =
             _We * _elo +
             _Wk * _KDR +
             _Wa * _assistRatio +
             _Wc * _clutchRatio +
-            Mathf.Min((float)_Wx * _gamesPlayed, 200f);
+            (_limitExpPoints == true 
+                ? Mathf.Min((float)_Wx * _gamesPlayed, (float)_maxExpPoints)
+                : _Wx * _gamesPlayed);
 
         _compositeSkill = newCS;
         if (outcome == 0)
         {
-            //making sure composite skill always decreases (by at least 2) in a loss
-            _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS - 100, (float)curCS - 2);
+            //making sure composite skill always decreases (by at least 2) in a loss, and max by 50
+            _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS - 50, (float)curCS - 2);
         }
         else
         {
@@ -295,7 +318,8 @@ public class PlayerData
             _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS + 2, (float)curCS + 100);
         }
 
-        _compositeSkill = Mathf.Clamp((float)_compositeSkill, minElo, maxElo);
+        if (_limitCompositeSkill)
+            _compositeSkill = Mathf.Clamp((float)_compositeSkill, minElo, maxElo);
     }
 
     public float GetCompositeSkillCalculation()
@@ -309,7 +333,9 @@ public class PlayerData
             _Wk * _KDR +
             _Wa * _assistRatio +
             _Wc * _clutchRatio +
-            Mathf.Min((float)_Wx * _gamesPlayed, 200f)
+            (_limitExpPoints == true
+                ? Mathf.Min((float)_Wx * _gamesPlayed, (float)_maxExpPoints)
+                : _Wx * _gamesPlayed)
         );
     }
 
@@ -324,7 +350,9 @@ public class PlayerData
             _Wk * _KDR + 
             _Wa * _assistRatio + 
             _Wc * _clutchRatio +
-            Mathf.Min((float)_Wx * _gamesPlayed, 200f)
+            (_limitExpPoints == true
+                ? Mathf.Min((float)_Wx * _gamesPlayed, (float)_maxExpPoints)
+                : _Wx * _gamesPlayed)
         ;
     }
 
@@ -386,25 +414,7 @@ public class PlayerData
         );
     }
 
-    public enum RatingConversion
-    {
-        None,
-        To_TrueSkill,
-        To_MyRating,
-    }
+    
 
-    public float ConvertRating(float rating, float min, float max, RatingConversion conversionType, bool conservative = false)
-    {
-        float trueSkillMin = 0f;
-        float trueSkillMax = 50f;
-
-        if (conversionType == RatingConversion.To_TrueSkill)
-            return trueSkillMin + ((rating - min) / (max - min)) * (trueSkillMax - trueSkillMin);
-        else if (conversionType == RatingConversion.To_MyRating && !conservative)
-            return min + (((float)_trueSkillRating.Mean - trueSkillMin) / (trueSkillMin - trueSkillMax)) * (max - min);
-        else if(conversionType == RatingConversion.To_MyRating && conservative)
-            return min + (((float)_trueSkillRating.ConservativeRating - trueSkillMin) / (trueSkillMin - trueSkillMax)) * (max - min);
-        else
-            return -1;
-    }
+    
 }

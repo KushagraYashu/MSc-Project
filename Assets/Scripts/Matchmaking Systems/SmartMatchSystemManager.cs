@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.LowLevel;
+using static VanillaTrueskillSystemManager;
 
 public class SmartMatchSystemManager : MonoBehaviour
 {
@@ -62,6 +63,10 @@ public class SmartMatchSystemManager : MonoBehaviour
     [SerializeField]
     public PoolPlayers[] poolPlayersList;
 
+    [Header("New Player Details")]
+    public float newPlayerRating = 0;
+    public bool isNewPlayerSmurf = false;
+
     List<double> MSEs = new();
     List<int> smurfPlayerIDs = new();
     int smurfCount = 0;
@@ -70,10 +75,14 @@ public class SmartMatchSystemManager : MonoBehaviour
 
     int lastMSEMatchCheckpoint = 0;
 
+    float minEloGlobal;
+    float maxEloGlobal;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-
+        minEloGlobal = CentralProperties.instance.eloRangePerPool[0].x;
+        maxEloGlobal = CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y;
     }
 
     // Update is called once per frame
@@ -122,9 +131,77 @@ public class SmartMatchSystemManager : MonoBehaviour
         return UnityEngine.Random.Range(top5PercentileMin, max);
     }
 
-    IEnumerator InitialiseSmartMatchSystem(int MPP)
+    int totalPlayers = 0;
+    int maxIDs = 0;
+    public void AddAPlayer()
     {
         var cp = CentralProperties.instance;
+
+        newPlayerRating = Mathf.Clamp(newPlayerRating, minEloGlobal, maxEloGlobal);
+
+        for (int i = 0; i < cp.totPools; i++)
+        {
+            if (newPlayerRating <= cp.eloRangePerPool[i].y && newPlayerRating >= cp.eloRangePerPool[i].x)
+            {
+                float minElo = cp.eloRangePerPool[i].x;
+                float maxElo = cp.eloRangePerPool[i].y;
+
+                Player newPlayer = new();
+
+                float realSkill;
+
+                int ID = MainServer.instance.GenerateRandomID(totalPlayers + Mathf.FloorToInt(0.3f * totalPlayers), maxIDs);
+
+                if (isNewPlayerSmurf)  //putting smurfs in the first pool
+                {
+                    realSkill = GetTop5PercentileElo(minEloGlobal, maxEloGlobal);
+                    newPlayer.playerType = Player.PlayerType.Smurf;
+                    newPlayer.playerPlayStyles.Add(Player.PlayerPlayStyle.Fragger);
+                    smurfPlayerIDs.Add(ID);
+                    smurfCount++;
+                }
+                else
+                {
+                    realSkill = GenerateNormallyDistributedRealSkill(minEloGlobal, maxEloGlobal);
+                }
+
+                newPlayer.SetPlayer(ID,
+                                    newPlayerRating,
+                                    realSkill,
+                                    i,
+                                    MPP_loc,
+                                    Player.PlayerState.Idle,
+                                    smartSys: true);
+
+                if (i == 0)
+                    newPlayer.playerPlayStyles.Add(Player.PlayerPlayStyle.Basic);
+
+                newPlayer.EloHistory.Add((float)newPlayer.playerData.CompositeSkill);
+                newPlayer.poolHistory.Add(i);
+
+                poolPlayersList[i].playersInPool.Add(newPlayer);
+                poolPlayersList[i].UpdatePoolSize(i);
+
+                Debug.LogError($"new player with ID {newPlayer.playerData.Id} and rating {newPlayer.playerData.CompositeSkill} added to pool {newPlayer.playerData.Pool}\nConfirmation from pool list {poolPlayersList[i].playersInPool.Contains(newPlayer)}");
+
+                break;
+            }
+        }
+
+        totalPlayers++;
+        cp.totPlayers++;
+
+        UIManager.instance.CancelAddPlayer();
+    }
+
+    int MPP_loc = 0;
+    IEnumerator InitialiseSmartMatchSystem(int MPP)
+    {
+        UIManager.instance.UpdateSmartSystemConfigurations();
+
+        var cp = CentralProperties.instance;
+
+        MPP_loc = MPP;
 
         int[] poolPlayers = new int[cp.totPools];
         for (int i = 0; i < cp.totPools; i++)
@@ -140,11 +217,10 @@ public class SmartMatchSystemManager : MonoBehaviour
             poolPlayersList[i] = new PoolPlayers();
         }
 
-        int totalPlayers = (int)cp.totPlayers;
-        int maxIDs = totalPlayers + Mathf.FloorToInt(0.2f * totalPlayers);
+        totalPlayers = (int)cp.totPlayers;
+        maxIDs = totalPlayers + Mathf.FloorToInt(0.2f * totalPlayers);
         int maxAttempts = totalPlayers + Mathf.FloorToInt(0.3f * totalPlayers);
-        float minEloGlobal = cp.eloRangePerPool[0].x;
-        float maxEloGlobal = cp.eloRangePerPool[cp.totPools - 1].y;
+        
         for (int i = 0; i < cp.totPools; i++)
         {
             float minElo = cp.eloRangePerPool[i].x;
@@ -798,10 +874,12 @@ public class SmartMatchSystemManager : MonoBehaviour
     {
         //players available for matching must be IDLE
         var idlePlayers = pool
-                            .Where(p => p.playerState == Player.PlayerState.Idle && p.playerData.GamesPlayed < totalMatches * 5)
+                            .Where(p => p.playerState == Player.PlayerState.Idle && p.playerData.GamesPlayed < totalMatches * 3)
                             .OrderBy(p => p.playerData.GamesPlayed)
                             .ThenBy(p => p.playerData.CompositeSkill)
                             .ToList();
+
+        if (idlePlayers.Count < teamSize * 2) return false;
 
         //matching players based on sorted composite skill
         if (!flip)
@@ -913,21 +991,21 @@ public class SmartMatchSystemManager : MonoBehaviour
             }
             else if (t1Streak.Bool && t2Streak.Bool)    //both team have losing streaks
             {
-                if (t1Streak.Count > t2Streak.Count)    //team 1 has more players on losing streak
-                {
-                    if ((t1Elo - t2Elo) >= losingStreakThreshold)
-                        return (true, teamPair.team1, teamPair.team2);
-                }
-                else if (t2Streak.Count > t1Streak.Count)   //team 2 has more players on losing streak
-                {
-                    if ((t2Elo - t1Elo) >= losingStreakThreshold)
-                        return (true, teamPair.team1, teamPair.team2);
-                }
-                else // Equal streak count
-                {
-                    if (Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
-                        return (true, teamPair.team1, teamPair.team2);
-                }
+                //if (t1Streak.Count > t2Streak.Count)    //team 1 has more players on losing streak
+                //{
+                //    if ((t1Elo - t2Elo) >= losingStreakThreshold)
+                //        return (true, teamPair.team1, teamPair.team2);
+                //}
+                //else if (t2Streak.Count > t1Streak.Count)   //team 2 has more players on losing streak
+                //{
+                //    if ((t2Elo - t1Elo) >= losingStreakThreshold)
+                //        return (true, teamPair.team1, teamPair.team2);
+                //}
+                //else // Equal streak count
+                //{
+                //    if (Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
+                //        return (true, teamPair.team1, teamPair.team2);
+                //}
             }
 
             // Neither team has streaks

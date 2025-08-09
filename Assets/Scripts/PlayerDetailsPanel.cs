@@ -26,7 +26,7 @@ public class PlayerDetailsPanel : MonoBehaviour
 
             case 2: //vanilla trueskill (moserware)
                 GetComponent<GraphMaker>().ShowGraph(p.scaledRatingHistory);
-                ratingText.text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F6");
+                ratingText.text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F6");
                 break;
 
             case 3: //smart match

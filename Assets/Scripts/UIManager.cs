@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
@@ -30,10 +31,88 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject[] _poolGOs;
     [SerializeField] private GameObject[] _poolPlayerCountTxtGOs;
 
+    [SerializeField] private GameObject _addPlayerScreenGO;
+    [SerializeField] private GameObject _newPlayerRatingGO;
+    [SerializeField] private GameObject _newPlayerSmurfCheckboxGO;
+
+    [SerializeField] private GameObject _smartSystemConfigurablesScreenGO;
+    [SerializeField] private GameObject[] _weightInputFieldsGOs;
+    [SerializeField] private GameObject _limitExpCheckboxGO;
+    [SerializeField] private GameObject _limitExpInputFieldGO;
+    [SerializeField] private GameObject _limitRatingPointsCheckboxGO;
+
     //internal variables
     int showPlayerIndex = 0;
     List<PlayerShowBox> allShowBoxes = new();
     PlayerDetailsPanel _currentActiveDetailsPanel = null;
+
+    private double _We = 01.00;
+    private double _Wk = 10.00;
+    private double _Wa = 04.00;
+    private double _Wc = 07.00;
+    private double _Wx = 00.25;
+
+    private float _maxExpPoints = 200;
+    private bool _limitExp = true;
+    private bool _limitRatingPoints = true;
+
+    public (double We, double Wk, double Wa, double Wc, double Wx) Weights
+    {
+        get { return (_We, _Wk, _Wa, _Wc, _Wx); }
+    }
+
+    public (bool LimitExp, float MaxExpPoints) ExpSettings
+    {
+        get { return (_limitExp, _maxExpPoints); }
+    }
+
+    public bool LimitRatingPoints
+    {
+        get { return _limitRatingPoints; }
+    }
+
+    public void UpdateSmartSystemConfigurations()
+    {
+        _We = double.Parse(_weightInputFieldsGOs[0].GetComponent<TMP_InputField>().text);
+        _Wk = double.Parse(_weightInputFieldsGOs[1].GetComponent<TMP_InputField>().text);
+        _Wa = double.Parse(_weightInputFieldsGOs[2].GetComponent<TMP_InputField>().text);
+        _Wc = double.Parse(_weightInputFieldsGOs[3].GetComponent<TMP_InputField>().text);
+        _Wx = double.Parse(_weightInputFieldsGOs[4].GetComponent<TMP_InputField>().text);
+
+        _limitExp = _limitExpCheckboxGO.GetComponent<Toggle>().isOn;
+        if (_limitExp)
+        {
+            _maxExpPoints = float.Parse(_limitExpInputFieldGO.GetComponent<TMP_InputField>().text);
+        }
+        else
+        {
+            _maxExpPoints = 0;
+        }
+
+        _limitRatingPoints = _limitRatingPointsCheckboxGO.GetComponent<Toggle>().isOn;
+    }
+
+    public void UpdateUIForSmartSystemConfigurations()
+    {
+        _weightInputFieldsGOs[0].GetComponent<TMP_InputField>().text = _We.ToString("F4");
+        _weightInputFieldsGOs[1].GetComponent<TMP_InputField>().text = _Wk.ToString("F4");
+        _weightInputFieldsGOs[2].GetComponent<TMP_InputField>().text = _Wa.ToString("F4");
+        _weightInputFieldsGOs[3].GetComponent<TMP_InputField>().text = _Wc.ToString("F4");
+        _weightInputFieldsGOs[4].GetComponent<TMP_InputField>().text = _Wx.ToString("F4");
+
+        _limitExpCheckboxGO.GetComponent<Toggle>().isOn = _limitExp;
+        _limitExpInputFieldGO.GetComponent<TMP_InputField>().text = _maxExpPoints.ToString("F4");
+        _limitRatingPointsCheckboxGO.GetComponent<Toggle>().isOn = _limitRatingPoints;
+    }
+
+    public void CheckSystem(int system)
+    {
+        if(system == 3)
+        {
+            UpdateUIForSmartSystemConfigurations();
+            _smartSystemConfigurablesScreenGO.SetActive(true);
+        }
+    }
 
     public GameObject FirstScreen
     {
@@ -65,6 +144,16 @@ public class UIManager : MonoBehaviour
         get { return _poolPlayerCountTxtGOs; }
     }
 
+    public GameObject NewPlayerRating
+    {
+        get { return _newPlayerRatingGO; }
+    }
+
+    public GameObject NewPlayerSmurfCheckbox
+    {
+        get { return _newPlayerSmurfCheckboxGO; }
+    }
+
     List<Player> snapshot;
     int curPage = 0;
     public void ShowPool(int poolIndex)
@@ -83,25 +172,25 @@ public class UIManager : MonoBehaviour
             case 0: //Elo
                 pool = EloSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
                 snapshot = new List<Player>(pool.Where(p => p != null));
-                snapshot = snapshot.OrderBy(p => p.playerData.GamesPlayed).ThenBy(p => p.playerData.Elo).ToList();
+                snapshot = snapshot.OrderBy(p => p.playerData.Id).ThenBy(p => p.playerData.Elo).ToList();
                 break;
 
             case 1: //glicko
                 pool = GlickoSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
                 snapshot = new List<Player>(pool.Where(p => p != null));
-                snapshot = snapshot.OrderBy(p => p.playerData.GamesPlayed).ThenBy(p => p.playerData.Elo).ToList();
+                snapshot = snapshot.OrderBy(p => p.playerData.Id).ThenBy(p => p.playerData.Elo).ToList();
                 break;
 
             case 2: //vanilla trueskill (moserware)
                 pool = VanillaTrueskillSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
                 snapshot = new List<Player>(pool.Where(p => p != null));
-                snapshot = snapshot.OrderBy(p => p.playerData.GamesPlayed).ThenBy(p => p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y)).ToList();
+                snapshot = snapshot.OrderBy(p => p.playerData.Id).ThenBy(p => VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating)).ToList();
                 break;
 
             case 3: //smart match
                 pool = SmartMatchSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
                 snapshot = new List<Player>(pool.Where(p => p != null));
-                snapshot = snapshot.OrderBy(p => p.playerData.GamesPlayed).ThenBy(p => p.playerData.CompositeSkill).ToList();
+                snapshot = snapshot.OrderBy(p => p.playerData.Id).ThenBy(p => p.playerData.CompositeSkill).ToList();
                 break;
         }
 
@@ -138,7 +227,7 @@ public class UIManager : MonoBehaviour
                     break;
 
                 case 2: //vanilla trueskill (moserware)
-                    allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F4");
+                    allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F4");
                     break;
 
                 case 3: //smart match
@@ -199,7 +288,7 @@ public class UIManager : MonoBehaviour
                         break;
 
                     case 2: //vanilla trueskill (moserware)
-                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F4");
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F4");
                         break;
 
                     case 3: //smart match
@@ -261,7 +350,7 @@ public class UIManager : MonoBehaviour
                         break;
 
                     case 2: //vanilla trueskill (moserware)
-                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = p.playerData.TrueSkillScaled(CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y).ToString("F4");
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F4");
                         break;
 
                     case 3: //smart match
@@ -305,6 +394,18 @@ public class UIManager : MonoBehaviour
                 box.UpdateDetails();
             }
         }
+    }
+
+    public void ShowAddPlayerScreen()
+    {
+        _addPlayerScreenGO.SetActive(true);
+    }
+
+    public void CancelAddPlayer()
+    {
+        _addPlayerScreenGO.SetActive(false);
+        _newPlayerSmurfCheckboxGO.GetComponent<Toggle>().isOn = false;
+        _newPlayerRatingGO.GetComponent<TMP_InputField>().text = "";
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created

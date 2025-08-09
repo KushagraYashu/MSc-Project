@@ -9,6 +9,8 @@ using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using static PlayerData;
+using static SmartMatchSystemManager;
 
 public class VanillaTrueskillSystemManager : MonoBehaviour
 {
@@ -26,7 +28,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     [Header("Match Properties")]
     public int maxRoundsPerMatch = 3;
     public int teamSize = 5;
-    public float eloThreshold = 50f;
+    public float matchingThreshold = 50f;
 
     //teams are now handled matchwise, that will make the matches be able to run simultaneously.
     //[Header("Teams")]
@@ -35,6 +37,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
     [Header("Debug Info")]
     public bool logTeams = true;
+    public TMP_Text minMatchPerPlayerText;
 
 
 
@@ -60,6 +63,10 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     [Header("Players")]
     [SerializeField]
     public PoolPlayers[] poolPlayersList;
+
+    [Header("New Player Details")]
+    public float newPlayerRating = 0;
+    public bool isNewPlayerSmurf = false;
 
     List<double> MSEs = new();
     List<int> smurfPlayerIDs = new();
@@ -121,8 +128,86 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         return UnityEngine.Random.Range(top5PercentileMin, max);
     }
 
+    public enum RatingConversion
+    {
+        None,
+        To_TrueSkill,
+        To_MyRating,
+    }
+    public float ConvertRating(float rating, float min, float max, RatingConversion conversionType)
+    {
+        float trueSkillMin = 0f;
+        float trueSkillMax = 50f;
+
+        if (conversionType == RatingConversion.To_TrueSkill)
+            return trueSkillMin + ((rating - min) / (max - min)) * (trueSkillMax - trueSkillMin);
+        else if (conversionType == RatingConversion.To_MyRating)
+            return min + ((rating - trueSkillMin) / (trueSkillMax - trueSkillMin)) * (max - min);
+        else
+            return -1;
+    }
+
+    int totalPlayers = 0;
+    int maxIDs = 0;
+    public void AddAPlayer()
+    {
+        var cp = CentralProperties.instance;
+
+        newPlayerRating = Mathf.Clamp(newPlayerRating, minEloGlobal, maxEloGlobal);
+
+        for(int i = 0; i < cp.totPools; i++)
+        {
+            if(newPlayerRating <= cp.eloRangePerPool[i].y && newPlayerRating >= cp.eloRangePerPool[i].x)
+            {
+                Player newPlayer = new();
+                float realSkill;
+
+                int ID = MainServer.instance.GenerateRandomID(totalPlayers + Mathf.FloorToInt(0.3f * totalPlayers), maxIDs);
+
+                if (isNewPlayerSmurf)  //putting smurfs in the first pool
+                {
+                    realSkill = GetTop5PercentileElo(minEloGlobal, maxEloGlobal);
+                    newPlayer.playerType = Player.PlayerType.Smurf;
+                    smurfPlayerIDs.Add(ID);
+                    smurfCount++;
+                }
+                else
+                {
+                    realSkill = GenerateNormallyDistributedRealSkill(minEloGlobal, maxEloGlobal);
+                }
+
+                newPlayer.SetPlayer(ID, newPlayerRating, realSkill,
+                                        trueSkillRating:
+                                            ConvertRating(newPlayerRating, minEloGlobal, maxEloGlobal, RatingConversion.To_TrueSkill),
+                                    i, MPP_loc, Player.PlayerState.Idle);
+
+                newPlayer.muHistory.Add(newPlayer.playerData.TrueSkillRating.Mean);
+                newPlayer.sigmaHistory.Add(newPlayer.playerData.TrueSkillRating.StandardDeviation);
+                newPlayer.conservativeValHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+                newPlayer.scaledRatingHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+
+                newPlayer.poolHistory.Add(i);
+
+                poolPlayersList[i].playersInPool.Add(newPlayer);
+                poolPlayersList[i].UpdatePoolSize(i);
+
+                Debug.LogError($"new player with ID {newPlayer.playerData.Id} and rating {newPlayer.playerData.Elo} added to pool {newPlayer.playerData.Pool}\nConfirmation from pool list {poolPlayersList[i].playersInPool.Contains(newPlayer)}");
+
+                break;
+            }
+        }
+
+        totalPlayers++;
+        cp.totPlayers++;
+
+        UIManager.instance.CancelAddPlayer();
+    }
+
+    int MPP_loc = 0;
     IEnumerator InitialiseTrueskillSystem(int MPP)
     {
+        MPP_loc = MPP;
+
         var cp = CentralProperties.instance;
 
         int[] poolPlayers = new int[cp.totPools];
@@ -139,8 +224,8 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             poolPlayersList[i] = new PoolPlayers();
         }
 
-        int totalPlayers = (int)cp.totPlayers;
-        int maxIDs = totalPlayers + Mathf.FloorToInt(0.2f * totalPlayers);
+        totalPlayers = (int)cp.totPlayers;
+        maxIDs = totalPlayers + Mathf.FloorToInt(0.2f * totalPlayers);
         int maxAttempts = totalPlayers + Mathf.FloorToInt(0.3f * totalPlayers);
         
         for (int i = 0; i < cp.totPools; i++)
@@ -171,13 +256,15 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
                 newPlayer.SetPlayer(ID, rating, realSkill, 
                                         trueSkillRating: 
-                                            newPlayer.playerData.ConvertRating(rating, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_TrueSkill),
+                                            ConvertRating(rating, minEloGlobal, maxEloGlobal, RatingConversion.To_TrueSkill),
                                     i, MPP, Player.PlayerState.Idle);
 
                 newPlayer.muHistory.Add(newPlayer.playerData.TrueSkillRating.Mean);
                 newPlayer.sigmaHistory.Add(newPlayer.playerData.TrueSkillRating.StandardDeviation);
-                newPlayer.conservativeValHistory.Add(newPlayer.playerData.TrueSkillRating.ConservativeRating);
-                newPlayer.scaledRatingHistory.Add(newPlayer.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating));
+                newPlayer.conservativeValHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+                newPlayer.scaledRatingHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+
+                //Debug.LogError($"{newPlayer.playerData.TrueSkillRating.Mean}\n{newPlayer.playerData.TrueSkillRating.ConservativeRating}\n{ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating)}\n{ConvertRating((float)newPlayer.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating)}");
 
                 newPlayer.poolHistory.Add(i);
 
@@ -213,7 +300,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             var pool = poolPlayersList[i].playersInPool;
             for (int j = 0; j < pool.Count; j++)
             {
-                float elo = (float)pool[j].playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating, conservative: true);
+                float elo = (float)ConvertRating((float)pool[j].playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating);
                 float realSkill = (float)pool[j].playerData.RealSkill;
                 float error = elo - realSkill;
 
@@ -248,16 +335,33 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
         while (totalRemainingPlayers > 0)
         {
-            int randomPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
+            int randomPool = -1;
+            int maxTries = 1000;
 
-            StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
-            totalMatchesSimulated++;
+            for (int attempts = 0; attempts < maxTries; attempts++)
+            {
+                int tryPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
+
+                if (poolPlayersList[tryPool].playersInPool.Any(p => p.playerData.MatchesToPlay > 0))
+                {
+                    randomPool = tryPool;
+                    break;
+                }
+            }
+
+            if (randomPool != -1)
+            {
+                StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
+                totalMatchesSimulated++;
+            }
 
             int minMatchesPlayed = int.MaxValue;
             for (int i = 0; i < allPlayers.Count; i++)
             {
                 minMatchesPlayed = Mathf.Min(minMatchesPlayed, allPlayers[i].playerData.GamesPlayed);
             }
+
+            minMatchPerPlayerText.text = minMatchesPlayed.ToString();
 
             // Checkpoint every 5 matches
             if (minMatchesPlayed > lastMSEMatchCheckpoint && minMatchesPlayed % 5 == 0)
@@ -317,7 +421,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             string poolHistoryStr = string.Join(";", player.poolHistory);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.TrueSkillRating.ConservativeRating},{player.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating)},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{muHistoryStr}\",\"{sigmaHistoryStr}\",\"{conservativeRatingHistoryStr}\",\"{scaledRatingHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.TrueSkillRating.ConservativeRating},{ConvertRating((float)player.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating)},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{muHistoryStr}\",\"{sigmaHistoryStr}\",\"{conservativeRatingHistoryStr}\",\"{scaledRatingHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -436,69 +540,155 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
     IEnumerator SimulateMatch(List<Player> team1, List<Player> team2, int matchSim)
     {
-        int team1wins = 0;
-        int team2wins = 0;
+        int team1RoundWins = 0;
+        int team2RoundWins = 0;
 
+        foreach (var p in team1)
+        {
+            p.playerData.ResetMatchData();
+        }
+        foreach (var p in team2)
+        {
+            p.playerData.ResetMatchData();
+        }
 
         for (int round = 0; round < maxRoundsPerMatch; round++)
         {
             List<Player> team1Shuffled = ShuffleCopy(team1);
             List<Player> team2Shuffled = ShuffleCopy(team2);
 
-            int team1Score = 0;
-            int team2Score = 0;
+            List<Player> aliveTeam1 = new List<Player>(team1Shuffled);
+            List<Player> aliveTeam2 = new List<Player>(team2Shuffled);
 
-            //1v1s
-            for (int i = 0; i < team1.Count; i++)
+            // Track potential clutch opportunity
+            bool team1HadClutchChance = false;
+            bool team2HadClutchChance = false;
+
+            Player team1LastAlive = null;
+            Player team2LastAlive = null;
+
+            while (aliveTeam1.Count > 0 && aliveTeam2.Count > 0)
             {
-                Player p1 = team1Shuffled[i];
-                Player p2 = team2Shuffled[i];
+                Player p1 = aliveTeam1[0];
+                Player p2 = aliveTeam2[0];
 
-                //calculating win probability based on real skill rather than elo
                 double p1WinProb = 1.0 / (1.0 + Math.Pow(10, (p2.playerData.RealSkill - p1.playerData.RealSkill) / 400.0));
 
-                double roll = rng.NextDouble();
-                bool p1Win = roll < p1WinProb;
+                bool p1Wins = rng.NextDouble() < p1WinProb;
 
-                if (p1Win)
+                // Update rounds played
+                p1.playerData.RoundsPlayed++;
+                p2.playerData.RoundsPlayed++;
+
+                if (p1Wins)
                 {
-                    team1Score++;
+                    p1.playerData.Kills++;
+                    p2.playerData.Deaths++;
+
+                    p1.playerData.thisMatchKills++;
+                    p2.playerData.thisMatchDeaths++;
+
+                    // Check if p1 is in a clutch
+                    if (aliveTeam1.Count == 1 && aliveTeam2.Count >= 2)
+                    {
+                        team1HadClutchChance = true;
+                        team1LastAlive = aliveTeam1[0];
+                    }
+
+                    aliveTeam2.Remove(p2);
+
+                    if (UnityEngine.Random.Range(0f, 1f) <= 0.5f) //50% chance of assist
+                    {
+                        //randomly select a player to award assist
+                        int i = UnityEngine.Random.Range(0, aliveTeam1.Count);
+                        var assistPlayer = aliveTeam1[i];
+                        assistPlayer.playerData.Assists++;
+                    }
                 }
                 else
                 {
-                    team2Score++;
+                    p1.playerData.Deaths++;
+                    p2.playerData.Kills++;
+
+                    p1.playerData.thisMatchDeaths++;
+                    p2.playerData.thisMatchKills++;
+
+                    if (aliveTeam2.Count == 1 && aliveTeam1.Count >= 2)
+                    {
+                        team2HadClutchChance = true;
+                        team2LastAlive = aliveTeam2[0];
+                    }
+
+                    aliveTeam1.Remove(p1);
+
+                    if (UnityEngine.Random.Range(0f, 1f) <= 0.5f) //50% chance of assist
+                    {
+                        //randomly select a player to award assist
+                        int i = UnityEngine.Random.Range(0, aliveTeam2.Count);
+                        var assistPlayer = aliveTeam2[i];
+                        assistPlayer.playerData.Assists++;
+                    }
                 }
 
-                if (i == team1.Count - 1)
-                    yield return null;
+                p1.playerData.UpdateKDR();
+                p2.playerData.UpdateKDR();
 
-                //yield return null;
-                //yield return new WaitForSeconds(0.5f); // Simulate a delay for each 1v1
+                yield return null;
             }
 
-            if (team1Score > team2Score)
+            // Determine round outcome and clutch success
+            if (aliveTeam1.Count > 0)
             {
-                team1wins++;
+                team1RoundWins++;
+
+                if (team1HadClutchChance && team1LastAlive != null)
+                {
+                    team1LastAlive.playerData.Clutches++;
+                    team1LastAlive.playerData.ClutchesPresented++;
+
+                    team1LastAlive.playerData.thisMatchClutches++;
+                    team1LastAlive.playerData.thisMatchClutchesPresented++;
+                }
+
+                if (team2HadClutchChance && team2LastAlive != null)
+                {
+                    team2LastAlive.playerData.ClutchesPresented++;
+
+                    team2LastAlive.playerData.thisMatchClutchesPresented++;
+                }
             }
             else
             {
-                team2wins++;
+                team2RoundWins++;
+
+                if (team2HadClutchChance && team2LastAlive != null)
+                {
+                    team2LastAlive.playerData.Clutches++;
+                    team2LastAlive.playerData.ClutchesPresented++;
+
+                    team2LastAlive.playerData.thisMatchClutches++;
+                    team2LastAlive.playerData.thisMatchClutchesPresented++;
+                }
+
+                if (team1HadClutchChance && team1LastAlive != null)
+                {
+                    team1LastAlive.playerData.ClutchesPresented++;
+
+                    team1LastAlive.playerData.thisMatchClutchesPresented++;
+                }
             }
 
-            //Debug.Log($"Round {round + 1}: Team 1: {team1Score}, Team 2: {team2Score}");
-
             yield return null;
-            //yield return new WaitForSeconds(1f); // Simulate a delay for each round
         }
 
         int winner = 0;
 
-        if (team1wins > team2wins)
+        if (team1RoundWins > team2RoundWins)
         {
             Debug.Log("Team 1 wins the match!");
             winner = 1;
         }
-        else if (team2wins > team1wins)
+        else if (team2RoundWins > team1RoundWins)
         {
             Debug.Log("Team 2 wins the match!");
             winner = 2;
@@ -506,8 +696,6 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
         UpdateTrueskill(ref team1, ref team2, winner);
 
-        //Debug.Log("Updating Ratings based on RD...");
-        // Elo update for team 1
         foreach (var p in team1)
         {
             p.playerData.GamesPlayed++;
@@ -517,7 +705,6 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             yield return null;
         }
 
-        // Elo update for team 2
         foreach (var p in team2)
         {
             p.playerData.GamesPlayed++;
@@ -535,7 +722,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     void CheckRankDerank(Player p)
     {
         int currentPool = p.playerData.Pool;
-        double elo = p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating);
+        double elo = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating);
 
         int newPool = -1;
         var cp = CentralProperties.instance;
@@ -629,10 +816,14 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         {
             p.playerData.TrueSkillRating = newRatings[p];
 
+            var scaledRating = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating);
+            scaledRating = Mathf.Clamp(scaledRating, minEloGlobal, maxEloGlobal);
+            p.playerData.TrueSkillRating = new(ConvertRating(scaledRating, minEloGlobal, maxEloGlobal, RatingConversion.To_TrueSkill), p.playerData.TrueSkillRating.StandardDeviation);
+
             p.muHistory.Add(p.playerData.TrueSkillRating.Mean);
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
-            p.conservativeValHistory.Add(p.playerData.TrueSkillRating.ConservativeRating);
-            p.scaledRatingHistory.Add(p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating));
+            p.conservativeValHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+            p.scaledRatingHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
 
             UIManager.instance.UpdateBoxContent(p);
 
@@ -642,10 +833,14 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         {
             p.playerData.TrueSkillRating = newRatings[p];
 
+            var scaledRating = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating);
+            scaledRating = Mathf.Clamp(scaledRating, minEloGlobal, maxEloGlobal);
+            p.playerData.TrueSkillRating = new(ConvertRating(scaledRating, minEloGlobal, maxEloGlobal, RatingConversion.To_TrueSkill), p.playerData.TrueSkillRating.StandardDeviation);
+
             p.muHistory.Add(p.playerData.TrueSkillRating.Mean);
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
-            p.conservativeValHistory.Add(p.playerData.TrueSkillRating.ConservativeRating);
-            p.scaledRatingHistory.Add(p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating));
+            p.conservativeValHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+            p.scaledRatingHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
 
             UIManager.instance.UpdateBoxContent(p);
 
@@ -653,35 +848,84 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
     }
 
+    int usingSorting = 0;
+    int usingRandomSampling = 0;
+
+    [Space(10)]
+    bool flip = false;
     public bool TrySplitFairTeamsAsync(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
     {
-        team1.Clear();
-        team2.Clear();
+        //players available for matching must be IDLE
+        var idlePlayers = pool
+                            .Where(p => p.playerState == Player.PlayerState.Idle && p.playerData.GamesPlayed < totalMatches * 3)
+                            .OrderBy(p => p.playerData.GamesPlayed)
+                            .ThenBy(p => p.playerData.TrueSkillRating.Mean)
+                            .ToList();
 
-        // Filter idle players only
-        List<Player> idlePlayers = pool.Where(p => p.playerState == Player.PlayerState.Idle).ToList();
+        if (idlePlayers.Count < teamSize * 2) return false;
 
-        int totalRequired = teamSize * 2;
-        if (idlePlayers.Count < totalRequired)
+        //matching players based on sorted composite skill
+        if (!flip)
         {
-            Debug.LogError($"Not enough IDLE players. Needed: {totalRequired}, Found: {idlePlayers.Count}");
-            return false;
+            for (int i = 0; i + teamSize * 2 <= idlePlayers.Count; i++)
+            {
+                var batch = idlePlayers.GetRange(i, teamSize * 2);
+
+                var result = GetTeams(batch);
+                if (result.Bool)
+                {
+                    team1 = result.team1;
+                    team2 = result.team2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+
+                    flip = true;
+                    usingSorting++;
+
+                    return true;
+                }
+            }
+
+            flip = true;
+        }
+        if (flip)
+        {
+            for (int i = idlePlayers.Count - teamSize * 2; i >= 0; i--)
+            {
+                var batch = idlePlayers.GetRange(i, teamSize * 2);
+
+                var result = GetTeams(batch);
+                if (result.Bool)
+                {
+                    team1 = result.team1;
+                    team2 = result.team2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+
+                    flip = false;
+                    usingSorting++;
+
+                    return true;
+                }
+            }
+
+            flip = false;
         }
 
-        int maxAttempts = (int)((pool.Count * 0.2) + pool.Count);
+        //sorting has failed, try random sample
+        var idlePlayersShuffled = ShuffleCopy(idlePlayers);
+        int maxAttempts = idlePlayersShuffled.Count * 3;
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             HashSet<int> selectedIndices = new();
 
             // Select 2 * teamSize unique indices randomly from the idlePlayers list
-            while (selectedIndices.Count < totalRequired)
+            while (selectedIndices.Count < teamSize * 2)
             {
-                int randIndex = rng.Next(idlePlayers.Count);
+                int randIndex = rng.Next(idlePlayersShuffled.Count);
                 selectedIndices.Add(randIndex);
             }
 
             // Convert to list for indexing
-            var selectedPlayers = selectedIndices.Select(i => idlePlayers[i]).ToList();
+            var selectedPlayers = selectedIndices.Select(i => idlePlayersShuffled[i]).ToList();
 
             // Shuffle the selected players (small list, so fast)
             for (int i = selectedPlayers.Count - 1; i > 0; i--)
@@ -690,46 +934,96 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
                 (selectedPlayers[i], selectedPlayers[j]) = (selectedPlayers[j], selectedPlayers[i]);
             }
 
-            // Split into two teams
-            var t1 = selectedPlayers.Take(teamSize).ToList();
-            var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
-
-            float avgElo1 = 0;
-            for (int i = 0; i < t1.Count; i++)
+            var getTeams = GetTeams(selectedPlayers);
+            if (getTeams.Bool)
             {
-                avgElo1 += (float)t1[i].playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating);
-            }
-            avgElo1 /= t1.Count;
-
-            float avgElo2 = 0;
-            for (int i = 0; i < t2.Count; i++)
-            {
-                avgElo2 += (float)t2[i].playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating);
-            }
-            avgElo2 /= t2.Count;
-
-            if (Mathf.Abs(avgElo1 - avgElo2) <= eloThreshold)
-            {
-                team1 = t1;
-                team2 = t2;
-
+                team1 = getTeams.team1;
+                team2 = getTeams.team2;
                 UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
 
-                if (logTeams)
-                {
-                    Debug.Log($"Fair match found! Elo diff: {Mathf.Abs(avgElo1 - avgElo2)}");
-                    Debug.Log("Team 1: Elo: " + avgElo1 + "\n" + string.Join(", ", team1.Select(p => $"{p.playerData.Id} ({p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating)})")));
-                    Debug.Log("Team 2: Elo: " + avgElo2 + "\n" + string.Join(", ", team2.Select(p => $"{p.playerData.Id} ({p.playerData.ConvertRating(0, minEloGlobal, maxEloGlobal, PlayerData.RatingConversion.To_MyRating)})")));
-                }
+                usingRandomSampling++;
 
                 return true;
             }
         }
 
-        Debug.LogWarning("No fair team found after 10,000 random samples.");
         return false;
     }
 
+    (bool Bool, List<Player> team1, List<Player> team2) GetTeams(List<Player> somePlayers)
+    {
+        var allTeams = GenerateAllPossibleCombinations(somePlayers, teamSize);
+
+        foreach(var teamPair in allTeams)
+        {
+            float avgT1 = teamPair.team1.Average(p => (float)ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+            float avgT2 = teamPair.team2.Average(p => (float)ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+
+            if (Mathf.Abs(avgT1 - avgT2) <= matchingThreshold)
+                return (true, teamPair.team1, teamPair.team2);
+        }
+
+        return (false, null, null);
+    }
+
+    public List<AllTeams> GenerateAllPossibleCombinations(List<Player> somePlayers, int teamSize)
+    {
+        if (somePlayers.Count < teamSize * 2)
+            throw new ArgumentException($"List size must be more than {teamSize * 2}");
+
+        var results = new List<AllTeams>();
+        var uniquePairs = new HashSet<string>();
+
+        foreach (var team1 in GetCombinations(somePlayers, teamSize))
+        {
+            var team2Candidates = somePlayers.Except(team1).ToList();
+
+            if (team2Candidates.Count >= teamSize)
+            {
+                foreach (var team2 in GetCombinations(team2Candidates, teamSize))
+                {
+                    // Create a canonical key using sorted IDs
+                    var t1Ids = team1.Select(p => p.playerData.Id).OrderBy(id => id);
+                    var t2Ids = team2.Select(p => p.playerData.Id).OrderBy(id => id);
+
+                    string team1Key = string.Join(",", t1Ids);
+                    string team2Key = string.Join(",", t2Ids);
+
+                    // Sort both team keys to ensure mirror pairs are treated the same
+                    var key = string.Compare(team1Key, team2Key) < 0 ?
+                              $"{team1Key}|{team2Key}" :
+                              $"{team2Key}|{team1Key}";
+
+                    if (!uniquePairs.Contains(key))
+                    {
+                        uniquePairs.Add(key);
+                        results.Add(new AllTeams(new List<Player>(team1), new List<Player>(team2)));
+                    }
+                }
+            }
+        }
+
+        return results;
+    }
+
+    // Helper function for combinations
+    IEnumerable<List<T>> GetCombinations<T>(List<T> list, int k, int start = 0)
+    {
+        if (k == 0)
+        {
+            yield return new List<T>();
+        }
+        else
+        {
+            for (int i = start; i <= list.Count - k; i++)
+            {
+                foreach (var tail in GetCombinations(list, k - 1, i + 1))
+                {
+                    yield return new List<T> { list[i] }.Concat(tail).ToList();
+                }
+            }
+        }
+    }
 
     //earlier approaches used this method, but it was not efficient for larger pools
     //now we just use a random sampling approach based on attempts rather than creating every single possible combination of players

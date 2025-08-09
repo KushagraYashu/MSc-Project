@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class MainServer : MonoBehaviour
 {
@@ -143,4 +144,38 @@ public class MainServer : MonoBehaviour
 
         throw new Exception("ID pool exhausted.");
     }
+
+    public void AddNewPlayer()
+    {
+        switch (_systemIndex)
+        {
+            case 0: //Elo
+                break;
+
+            case 1: //Glicko
+                break;
+
+            case 2: //Vanilla TrueSkill (Moserware)
+                var vtsm = VanillaTrueskillSystemManager.instance;
+
+                vtsm.newPlayerRating = float.Parse(UIManager.instance.NewPlayerRating.GetComponent<TMP_InputField>().text);
+                vtsm.isNewPlayerSmurf = UIManager.instance.NewPlayerSmurfCheckbox.GetComponent<Toggle>().isOn;
+
+                vtsm.AddAPlayer();
+
+                break;
+
+            case 3: //SmartMatch
+                var sm = SmartMatchSystemManager.instance;
+
+                sm.newPlayerRating = float.Parse(UIManager.instance.NewPlayerRating.GetComponent<TMP_InputField>().text);
+                sm.isNewPlayerSmurf = UIManager.instance.NewPlayerSmurfCheckbox.GetComponent<Toggle>().isOn;
+
+                sm.AddAPlayer();
+
+                break;
+        }
+    }
+
+    
 }

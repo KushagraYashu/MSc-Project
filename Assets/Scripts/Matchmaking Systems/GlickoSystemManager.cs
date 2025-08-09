@@ -158,7 +158,7 @@ public class GlickoSystemManager : MonoBehaviour
 
                 newPlayer.SetPlayer(ID,
                                     elo,
-                                    200f,   //RD
+                                    RD: 200f,   //RD
                                     realSkill,
                                     i,
                                     MPP,

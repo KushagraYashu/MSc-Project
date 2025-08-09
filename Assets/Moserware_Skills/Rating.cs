@@ -57,7 +57,7 @@ namespace Moserware.Skills
         /// </summary>
         public double ConservativeRating
         {
-            get { return _Mean - _ConservativeStandardDeviationMultiplier*_StandardDeviation; }
+            get { return Math.Clamp(_Mean - _ConservativeStandardDeviationMultiplier * _StandardDeviation, 0, 50); }
         }
 
         public static Rating GetPartialUpdate(Rating prior, Rating fullPosterior, double updatePercentage)
