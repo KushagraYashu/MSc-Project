@@ -309,8 +309,8 @@ public class PlayerData
         _compositeSkill = newCS;
         if (outcome == 0)
         {
-            //making sure composite skill always decreases (by at least 2) in a loss, and max by 50
-            _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS - 50, (float)curCS - 2);
+            //making sure composite skill always decreases (by at least 2) in a loss, and max by 100
+            _compositeSkill = Mathf.Clamp((float)_compositeSkill, (float)curCS - 100, (float)curCS - 2);
         }
         else
         {

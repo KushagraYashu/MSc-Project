@@ -286,7 +286,7 @@ public class SmartMatchSystemManager : MonoBehaviour
     IEnumerator CalculateMSE()
     {
         float totalError = 0f;
-        uint totalPlayers = CentralProperties.instance.totPlayers;
+        int totalPlayers = CentralProperties.instance.totPlayers;
 
         for (int i = 0; i < poolPlayersList.Length; i++)
         {
@@ -773,13 +773,13 @@ public class SmartMatchSystemManager : MonoBehaviour
         double expectedScore = 0.0f;
         foreach(var pT2 in otherTeam)
         {
-            expectedScore += 1.0 / (1.0 + Math.Pow(10, (pT2.playerData.Elo - p.playerData.Elo) / 400.0));
+            expectedScore += 1.0 / (1.0 + Math.Pow(10, (pT2.playerData.CompositeSkill - p.playerData.CompositeSkill) / 400.0));
         }
         expectedScore /= otherTeam.Count;
 
         int K;
         //K value inspired by FIDE (Federation Internationale des Echecs or World Chess Federation) regulations
-        if (p.playerData.GamesPlayed <= 30 && p.playerData.Pool < 2)
+        if (p.playerData.GamesPlayed <= 30)
             K = 40;
         else
         {
@@ -991,25 +991,24 @@ public class SmartMatchSystemManager : MonoBehaviour
             }
             else if (t1Streak.Bool && t2Streak.Bool)    //both team have losing streaks
             {
-                //if (t1Streak.Count > t2Streak.Count)    //team 1 has more players on losing streak
-                //{
-                //    if ((t1Elo - t2Elo) >= losingStreakThreshold)
-                //        return (true, teamPair.team1, teamPair.team2);
-                //}
-                //else if (t2Streak.Count > t1Streak.Count)   //team 2 has more players on losing streak
-                //{
-                //    if ((t2Elo - t1Elo) >= losingStreakThreshold)
-                //        return (true, teamPair.team1, teamPair.team2);
-                //}
-                //else // Equal streak count
-                //{
-                //    if (Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
-                //        return (true, teamPair.team1, teamPair.team2);
-                //}
+                if (t1Streak.Count > t2Streak.Count)    //team 1 has more players on losing streak
+                {
+                    if ((t1Elo - t2Elo) >= losingStreakThreshold)
+                        return (true, teamPair.team1, teamPair.team2);
+                }
+                else if (t2Streak.Count > t1Streak.Count)   //team 2 has more players on losing streak
+                {
+                    if ((t2Elo - t1Elo) >= losingStreakThreshold)
+                        return (true, teamPair.team1, teamPair.team2);
+                }
+                else // Equal streak count
+                {
+                    if (Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
+                        return (true, teamPair.team1, teamPair.team2);
+                }
             }
-
             // Neither team has streaks
-            if (Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
+            else if (Mathf.Abs(t1Elo - t2Elo) <= matchingThreshold)
                 return (true, teamPair.team1, teamPair.team2);
         }
 

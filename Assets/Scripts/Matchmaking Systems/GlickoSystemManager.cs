@@ -196,7 +196,7 @@ public class GlickoSystemManager : MonoBehaviour
     IEnumerator CalculateMSE()
     {
         float totalError = 0f;
-        uint totalPlayers = CentralProperties.instance.totPlayers;
+        int totalPlayers = CentralProperties.instance.totPlayers;
 
         for (int i = 0; i < poolPlayersList.Length; i++)
         {

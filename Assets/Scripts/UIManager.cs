@@ -47,7 +47,7 @@ public class UIManager : MonoBehaviour
     PlayerDetailsPanel _currentActiveDetailsPanel = null;
 
     private double _We = 01.00;
-    private double _Wk = 10.00;
+    private double _Wk = 12.00;
     private double _Wa = 04.00;
     private double _Wc = 07.00;
     private double _Wx = 00.25;

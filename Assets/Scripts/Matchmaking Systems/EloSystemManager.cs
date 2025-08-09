@@ -192,7 +192,7 @@ public class EloSystemManager : MonoBehaviour
     IEnumerator CalculateMSE()
     {
         float totalError = 0f;
-        uint totalPlayers = CentralProperties.instance.totPlayers;
+        int totalPlayers = CentralProperties.instance.totPlayers;
 
         for (int i = 0; i < poolPlayersList.Length; i++)
         {
@@ -559,7 +559,7 @@ public class EloSystemManager : MonoBehaviour
         {
             p.playerData.GamesPlayed++;
 
-            UpdateEloForPlayer(1, p, winner, expectedResultTeam1);
+            UpdateEloForPlayer(1, p, team2, winner);
 
             CheckRankDerank(p);
 
@@ -571,7 +571,7 @@ public class EloSystemManager : MonoBehaviour
         {
             p.playerData.GamesPlayed++;
 
-            UpdateEloForPlayer(2, p, winner, expectedResultTeam2);
+            UpdateEloForPlayer(2, p, team1, winner);
 
             CheckRankDerank(p);
 
@@ -630,11 +630,18 @@ public class EloSystemManager : MonoBehaviour
         }
     }
 
-    void UpdateEloForPlayer(int team, Player p, int winner, double expectedScore)
+    void UpdateEloForPlayer(int team, Player p, List<Player> otherTeam, int winner)
     {
+        double expectedScore = 0.0f;
+        foreach (var pT2 in otherTeam)
+        {
+            expectedScore += 1.0 / (1.0 + Math.Pow(10, (pT2.playerData.Elo - p.playerData.Elo) / 400.0));
+        }
+        expectedScore /= otherTeam.Count;
+
         int K;
         //K value according to FIDE
-        if(p.playerData.GamesPlayed <= 30)
+        if(p.playerData.GamesPlayed < 30)
             K = 40;
         else
         {
