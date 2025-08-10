@@ -399,7 +399,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,KDA,Kills,Deaths,Clutches,Assists,CS,RealSkill,PMHistory,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
+        csvContent.AppendLine("PlayerID,KDA,Kills,Deaths,ClutchRatio,AssistRatio,CS,RealSkill,PMHistory,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
 
         string MSEListStr = string.Join(";", MSEs);
         string smurfListStr = string.Join(";", smurfPlayerIDs);
@@ -416,7 +416,7 @@ public class SmartMatchSystemManager : MonoBehaviour
             string PMHistoryStr = string.Join(";", player.playerData.PerformanceMultipliers);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.KDR},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.Clutches},{player.playerData.Assists},{player.playerData.CompositeSkill},{player.playerData.RealSkill},\"{PMHistoryStr}\",{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.KDR},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.ClutchRatio},{player.playerData.AssistRatio},{player.playerData.CompositeSkill},{player.playerData.RealSkill},\"{PMHistoryStr}\",{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{CSHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -779,7 +779,7 @@ public class SmartMatchSystemManager : MonoBehaviour
 
         int K;
         //K value inspired by FIDE (Federation Internationale des Echecs or World Chess Federation) regulations
-        if (p.playerData.GamesPlayed <= 30)
+        if (p.playerData.GamesPlayed <= 30 && p.playerData.CompositeSkill < 2300)
             K = 40;
         else
         {
@@ -831,13 +831,7 @@ public class SmartMatchSystemManager : MonoBehaviour
     {
         player.playerData.CalculateMatchData();
 
-        double matchPerformance = player.playerData.CalculateMatchPerformance();
-
-        if (matchPerformance > 2.5) return 2.0;
-        if (matchPerformance > 2.0) return 1.7;
-        if (matchPerformance > 1.5) return 1.5;
-        if (matchPerformance < 0.5) return 0.8;
-        return 1.0;
+        return player.playerData.CalculateMatchPerformance();
     }
 
     float CalcTeamElo(List<Player> team)

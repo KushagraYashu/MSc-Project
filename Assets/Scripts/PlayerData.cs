@@ -126,6 +126,16 @@ public class PlayerData
         set { _assists = value; }
     }
 
+    public double AssistRatio
+    {
+        get { return _assistRatio; }
+    }
+
+    public double ClutchRatio
+    {
+        get { return _clutchRatio; }
+    }
+
     public uint Deaths
     {
         get { return _deaths; }
@@ -404,17 +414,22 @@ public class PlayerData
 
     public float CalculateMatchPerformance()
     {
-        //assuming that bad players have a 0.02 KDR, 0.01 assist ratio, and 0.01 clutch ratio. The value will be 0.04. A very good player will have KDR more than 1.5, assist ratio of at least 0.5, and clutch ratio of 0.7, bringing the value to 2.7.
-        //The assists are randomly given, so take the values with a grain of salt.
+        float KDRratio = 0;
+        float assistRatio = 0;
+        float clutchRatio = 0;
+        if (_KDR != 0)
+            KDRratio = (float)(thisMatchKDR / _KDR);
+        else
+            KDRratio = thisMatchKDR;
+        if (_assistRatio != 0)
+            assistRatio = (float)(thisMatchAssistRatio / _assistRatio);
+        else
+            assistRatio = thisMatchAssistRatio;
+        if (_clutchRatio != 0)
+            clutchRatio = (float)(thisMatchClutchRatio / _clutchRatio);
+        else
+            clutchRatio = thisMatchClutchRatio;
 
-        return (float)(
-            thisMatchKDR +
-            thisMatchAssistRatio +
-            thisMatchClutchRatio
-        );
+        return Mathf.Clamp(KDRratio + assistRatio + clutchRatio, 0.8f, 2f);
     }
-
-    
-
-    
 }
