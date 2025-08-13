@@ -137,7 +137,7 @@ public class SmartMatchSystemManager : MonoBehaviour
     {
         var cp = CentralProperties.instance;
 
-        newPlayerRating = Mathf.Clamp(newPlayerRating, minEloGlobal, maxEloGlobal);
+        newPlayerRating = Mathf.Clamp(newPlayerRating, minEloGlobal + 50, maxEloGlobal);
 
         for (int i = 0; i < cp.totPools; i++)
         {
@@ -866,7 +866,7 @@ public class SmartMatchSystemManager : MonoBehaviour
     bool flip = false;
     public bool TrySplitFairTeams(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
     {
-        //players available for matching must be IDLE
+        //players available for matching must be IDLE and have played less than 3 times the min required matches
         var idlePlayers = pool
                             .Where(p => p.playerState == Player.PlayerState.Idle && p.playerData.GamesPlayed < totalMatches * 3)
                             .OrderBy(p => p.playerData.GamesPlayed)

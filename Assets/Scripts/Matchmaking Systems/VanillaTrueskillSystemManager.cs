@@ -165,7 +165,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     {
         var cp = CentralProperties.instance;
 
-        newPlayerRating = Mathf.Clamp(newPlayerRating, minEloGlobal, maxEloGlobal);
+        newPlayerRating = Mathf.Clamp(newPlayerRating, minEloGlobal + 50, maxEloGlobal);
 
         for(int i = 0; i < cp.totPools; i++)
         {

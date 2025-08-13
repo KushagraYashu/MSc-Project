@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using static VanillaTrueskillSystemManager;
 
 public class EloSystemManager : MonoBehaviour
 {
@@ -32,6 +33,8 @@ public class EloSystemManager : MonoBehaviour
 
     [Header("Debug Info")]
     public bool logTeams = true;
+    public TMP_Text minMatchPerPlayerText;
+
 
     [System.Serializable]
     public class PoolPlayers
@@ -57,6 +60,10 @@ public class EloSystemManager : MonoBehaviour
     [SerializeField]
     public PoolPlayers[] poolPlayersList;
 
+    [Header("New Player Details")]
+    public float newPlayerRating = 0;
+    public bool isNewPlayerSmurf = false;
+
     List<double> MSEs = new();
     List<int> smurfPlayerIDs = new();
     int smurfCount = 0;
@@ -64,11 +71,14 @@ public class EloSystemManager : MonoBehaviour
     System.Random rng = new();
 
     int lastMSEMatchCheckpoint = 0;
-
+    float minEloGlobal;
+    float maxEloGlobal; 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        
+        var cp = CentralProperties.instance;
+        minEloGlobal = cp.eloRangePerPool[0].x;
+        maxEloGlobal = cp.eloRangePerPool[cp.totPools - 1].y;
     }
 
     // Update is called once per frame
@@ -109,8 +119,68 @@ public class EloSystemManager : MonoBehaviour
         return UnityEngine.Random.Range(top5PercentileMin, max);
     }
 
+
+    int totalPlayers = 0;
+    int maxIDs = 0;
+    public void AddAPlayer()
+    {
+        var cp = CentralProperties.instance;
+
+        newPlayerRating = Mathf.Clamp(newPlayerRating, minEloGlobal + 50, maxEloGlobal);
+
+        for (int i = 0; i < cp.totPools; i++)
+        {
+            if (newPlayerRating <= cp.eloRangePerPool[i].y && newPlayerRating >= cp.eloRangePerPool[i].x)
+            {
+                Player newPlayer = new();
+
+                float realSkill;
+
+                int ID = MainServer.instance.GenerateRandomID(totalPlayers + Mathf.FloorToInt(0.3f * totalPlayers), maxIDs);
+
+                if (isNewPlayerSmurf)  //putting smurfs in the first pool
+                {
+                    realSkill = GetTop5PercentileElo(minEloGlobal, maxEloGlobal);
+                    newPlayer.playerType = Player.PlayerType.Smurf;
+                    smurfPlayerIDs.Add(ID);
+                    smurfCount++;
+                }
+                else
+                {
+                    realSkill = GenerateNormallyDistributedRealSkill(minEloGlobal, maxEloGlobal);
+                }
+
+                newPlayer.SetPlayer(ID,
+                                    newPlayerRating,
+                                    realSkill,
+                                    i,
+                                    MPP_loc,
+                                    Player.PlayerState.Idle
+                                    );
+
+                newPlayer.EloHistory.Add((float)newPlayer.playerData.Elo);
+                newPlayer.poolHistory.Add(i);
+
+                poolPlayersList[i].playersInPool.Add(newPlayer);
+                poolPlayersList[i].UpdatePoolSize(i);
+
+                Debug.LogError($"new player with ID {newPlayer.playerData.Id} and rating {newPlayer.playerData.CompositeSkill} added to pool {newPlayer.playerData.Pool}\nConfirmation from pool list {poolPlayersList[i].playersInPool.Contains(newPlayer)}");
+
+                break;
+            }
+        }
+
+        totalPlayers++;
+        cp.totPlayers++;
+
+        UIManager.instance.CancelAddPlayerUI();
+    }
+
+    int MPP_loc = 0;
     IEnumerator InitialiseEloSystem(int MPP)
     {
+        MPP_loc = MPP;
+
         var cp = CentralProperties.instance;
 
         int[] poolPlayers = new int[cp.totPools];
@@ -127,11 +197,10 @@ public class EloSystemManager : MonoBehaviour
             poolPlayersList[i] = new PoolPlayers();
         }
 
-        int totalPlayers = (int)cp.totPlayers;
-        int maxIDs = totalPlayers + Mathf.FloorToInt(0.2f * totalPlayers);
+        totalPlayers = (int)cp.totPlayers;
+        maxIDs = totalPlayers + Mathf.FloorToInt(0.2f * totalPlayers);
         int maxAttempts = totalPlayers + Mathf.FloorToInt(0.3f * totalPlayers);
-        float minEloGlobal = cp.eloRangePerPool[0].x;
-        float maxEloGlobal = cp.eloRangePerPool[cp.totPools - 1].y;
+        
         for (int i = 0; i < cp.totPools; i++)
         {
             float minElo = cp.eloRangePerPool[i].x;
@@ -140,7 +209,7 @@ public class EloSystemManager : MonoBehaviour
             for (int j = 0; j < poolPlayers[i]; j++)
             {
                 Player newPlayer = new();
-                float elo = minElo;
+                float elo = minElo + 50;
                 float realSkill = 0;
                 int ID = MainServer.instance.GenerateRandomID(maxAttempts, maxIDs);
 
@@ -234,16 +303,33 @@ public class EloSystemManager : MonoBehaviour
 
         while (totalRemainingPlayers > 0)
         {
-            int randomPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
+            int randomPool = -1;
+            int maxTries = 1000;
 
-            StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
-            totalMatchesSimulated++;
+            for (int attempts = 0; attempts < maxTries; attempts++)
+            {
+                int tryPool = UnityEngine.Random.Range(0, CentralProperties.instance.totPools);
+
+                if (poolPlayersList[tryPool].playersInPool.Any(p => p.playerData.MatchesToPlay > 0))
+                {
+                    randomPool = tryPool;
+                    break;
+                }
+            }
+
+            if (randomPool != -1)
+            {
+                StartTeamSplit(poolPlayersList[randomPool].playersInPool, randomPool, totalMatchesSimulated);
+                totalMatchesSimulated++;
+            }
 
             int minMatchesPlayed = int.MaxValue;
             for (int i = 0; i < allPlayers.Count; i++)
             {
                 minMatchesPlayed = Mathf.Min(minMatchesPlayed, allPlayers[i].playerData.GamesPlayed);
             }
+
+            minMatchPerPlayerText.text = minMatchesPlayed.ToString();
 
             // Checkpoint every 5 matches
             if (minMatchesPlayed > lastMSEMatchCheckpoint && minMatchesPlayed % 5 == 0)
@@ -264,6 +350,8 @@ public class EloSystemManager : MonoBehaviour
         }
 
         StartCoroutine(CalculateMSE());
+
+        minMatchPerPlayerText.text = MPP_loc.ToString();
 
         Debug.Log($"All players in all pools have completed their required matches. Total matches: {totalMatchesSimulated}");
 
@@ -288,7 +376,7 @@ public class EloSystemManager : MonoBehaviour
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,Elo,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,EloHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
+        csvContent.AppendLine("PlayerID,KDR,Kills,Deaths,ClutchRatio,AssistRatio,Elo,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,EloHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
 
         string MSEListStr = string.Join(";", MSEs);
         string smurfListStr = string.Join(";", smurfPlayerIDs);
@@ -301,9 +389,10 @@ public class EloSystemManager : MonoBehaviour
             // Serialise lists as semicolon-separated strings
             string eloHistoryStr = string.Join(";", player.EloHistory);
             string poolHistoryStr = string.Join(";", player.poolHistory);
+            string outcomeHistoryStr = string.Join(";", player.playerData.Outcomes);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.Elo},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{eloHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.KDR},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.ClutchRatio},{player.playerData.AssistRatio},{player.playerData.Elo},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{eloHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -376,7 +465,7 @@ public class EloSystemManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Could not find suitable teams, trying again with merging another pool");
+            Debug.LogError($"Could not find suitable teams {whichPool}, trying again with merging another pool");
             var combinedPool = new List<Player>(poolPlayersList[whichPool].playersInPool);
             if (whichPool > 0)
             {
@@ -425,6 +514,15 @@ public class EloSystemManager : MonoBehaviour
         int team1RoundWins = 0;
         int team2RoundWins = 0;
 
+        foreach (var p in team1)
+        {
+            p.playerData.ResetMatchData();
+        }
+        foreach (var p in team2)
+        {
+            p.playerData.ResetMatchData();
+        }
+
         for (int round = 0; round < maxRoundsPerMatch; round++)
         {
             List<Player> team1Shuffled = ShuffleCopy(team1);
@@ -458,6 +556,9 @@ public class EloSystemManager : MonoBehaviour
                     p1.playerData.Kills++;
                     p2.playerData.Deaths++;
 
+                    p1.playerData.thisMatchKills++;
+                    p2.playerData.thisMatchDeaths++;
+
                     // Check if p1 is in a clutch
                     if (aliveTeam1.Count == 1 && aliveTeam2.Count >= 2)
                     {
@@ -466,11 +567,22 @@ public class EloSystemManager : MonoBehaviour
                     }
 
                     aliveTeam2.Remove(p2);
+
+                    if (UnityEngine.Random.Range(0f, 1f) <= 0.5f) //50% chance of assist
+                    {
+                        //randomly select a player to award assist
+                        int i = UnityEngine.Random.Range(0, aliveTeam1.Count);
+                        var assistPlayer = aliveTeam1[i];
+                        assistPlayer.playerData.Assists++;
+                    }
                 }
                 else
                 {
                     p1.playerData.Deaths++;
                     p2.playerData.Kills++;
+
+                    p1.playerData.thisMatchDeaths++;
+                    p2.playerData.thisMatchKills++;
 
                     if (aliveTeam2.Count == 1 && aliveTeam1.Count >= 2)
                     {
@@ -479,6 +591,14 @@ public class EloSystemManager : MonoBehaviour
                     }
 
                     aliveTeam1.Remove(p1);
+
+                    if (UnityEngine.Random.Range(0f, 1f) <= 0.5f) //50% chance of assist
+                    {
+                        //randomly select a player to award assist
+                        int i = UnityEngine.Random.Range(0, aliveTeam2.Count);
+                        var assistPlayer = aliveTeam2[i];
+                        assistPlayer.playerData.Assists++;
+                    }
                 }
 
                 p1.playerData.UpdateKDR();
@@ -496,11 +616,16 @@ public class EloSystemManager : MonoBehaviour
                 {
                     team1LastAlive.playerData.Clutches++;
                     team1LastAlive.playerData.ClutchesPresented++;
+
+                    team1LastAlive.playerData.thisMatchClutches++;
+                    team1LastAlive.playerData.thisMatchClutchesPresented++;
                 }
 
                 if (team2HadClutchChance && team2LastAlive != null)
                 {
                     team2LastAlive.playerData.ClutchesPresented++;
+
+                    team2LastAlive.playerData.thisMatchClutchesPresented++;
                 }
             }
             else
@@ -511,11 +636,16 @@ public class EloSystemManager : MonoBehaviour
                 {
                     team2LastAlive.playerData.Clutches++;
                     team2LastAlive.playerData.ClutchesPresented++;
+
+                    team2LastAlive.playerData.thisMatchClutches++;
+                    team2LastAlive.playerData.thisMatchClutchesPresented++;
                 }
 
                 if (team1HadClutchChance && team1LastAlive != null)
                 {
                     team1LastAlive.playerData.ClutchesPresented++;
+
+                    team1LastAlive.playerData.thisMatchClutchesPresented++;
                 }
             }
 
@@ -552,14 +682,13 @@ public class EloSystemManager : MonoBehaviour
         double expectedResultTeam1 = 1.0 / (1.0 + Math.Pow(10, (avgEloTeam2 - avgEloTeam1) / 400.0));
         double expectedResultTeam2 = 1.0 - expectedResultTeam1;
 
-
         //Debug.Log("Updating Elo Ratings...");
         // Elo update for team 1
         foreach (var p in team1)
         {
             p.playerData.GamesPlayed++;
 
-            UpdateEloForPlayer(1, p, team2, winner);
+            UpdateEloForPlayer(1, p, winner, (float)expectedResultTeam1);
 
             CheckRankDerank(p);
 
@@ -571,7 +700,7 @@ public class EloSystemManager : MonoBehaviour
         {
             p.playerData.GamesPlayed++;
 
-            UpdateEloForPlayer(2, p, team1, winner);
+            UpdateEloForPlayer(2, p, winner, (float)expectedResultTeam2);
 
             CheckRankDerank(p);
 
@@ -630,18 +759,12 @@ public class EloSystemManager : MonoBehaviour
         }
     }
 
-    void UpdateEloForPlayer(int team, Player p, List<Player> otherTeam, int winner)
+    void UpdateEloForPlayer(int team, Player p, int winner, float expectedScore)
     {
-        double expectedScore = 0.0f;
-        foreach (var pT2 in otherTeam)
-        {
-            expectedScore += 1.0 / (1.0 + Math.Pow(10, (pT2.playerData.Elo - p.playerData.Elo) / 400.0));
-        }
-        expectedScore /= otherTeam.Count;
-
         int K;
-        //K value according to FIDE
-        if(p.playerData.GamesPlayed < 30)
+
+        //K value inspired by FIDE (Federation Internationale des Echecs or World Chess Federation) regulations
+        if (p.playerData.GamesPlayed <= 30 && p.playerData.CompositeSkill < 2300)
             K = 40;
         else
         {
@@ -650,7 +773,8 @@ public class EloSystemManager : MonoBehaviour
             else
                 K = 10;
         }
-            double actualResult = winner == team ? 1.0 : 0.0;
+
+        double actualResult = winner == team ? 1.0 : 0.0;
 
         if (actualResult == 1.0)
         {
@@ -665,6 +789,9 @@ public class EloSystemManager : MonoBehaviour
         double delta = K * (actualResult - expectedScore);
         p.playerData.Elo += delta;
 
+        //clamping
+        p.playerData.Elo = Mathf.Clamp((float)p.playerData.Elo, minEloGlobal, maxEloGlobal);
+
         p.EloHistory.Add((float)p.playerData.Elo);
         p.totalChangeFromStart += (float)delta;
 
@@ -673,43 +800,84 @@ public class EloSystemManager : MonoBehaviour
         //Debug.Log($"Team {team}\nPlayer {p.playerData.Id} (Pool {poolIndex}) Elo updated: {p.playerData.Elo} (Delta: {delta})");
     }
 
+    int usingSorting = 0;
+    int usingRandomSampling = 0;
+
+    [Space(10)]
+    bool flip = false;
     public bool TrySplitFairTeamsAsync(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
     {
-        team1.Clear();
-        team2.Clear();
+        //players available for matching must be IDLE and have played less than 3 times the min required matches
+        var idlePlayers = pool
+                            .Where(p => p.playerState == Player.PlayerState.Idle && p.playerData.GamesPlayed < totalMatches * 3)
+                            .OrderBy(p => p.playerData.GamesPlayed)
+                            .ThenBy(p => p.playerData.CompositeSkill)
+                            .ToList();
 
-        // Filter idle players only
-        List<Player> idlePlayers = new();
-        for(int i=0; i<pool.Count; i++)
+        if (idlePlayers.Count < teamSize * 2) return false;
+
+        //matching players based on sorted composite skill
+        if (!flip)
         {
-            if (pool[i].playerState == Player.PlayerState.Idle)
+            for (int i = 0; i + teamSize * 2 <= idlePlayers.Count; i++)
             {
-                idlePlayers.Add(pool[i]);
+                var batch = idlePlayers.GetRange(i, teamSize * 2);
+
+                var result = GetTeams(batch);
+                if (result.Bool)
+                {
+                    team1 = result.team1;
+                    team2 = result.team2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+
+                    flip = true;
+                    usingSorting++;
+
+                    return true;
+                }
             }
-        }
 
-        int totalRequired = teamSize * 2;
-        if (idlePlayers.Count < totalRequired)
+            flip = true;
+        }
+        if (flip)
         {
-            Debug.LogError($"Not enough IDLE players. Needed: {totalRequired}, Found: {idlePlayers.Count}");
-            return false;
+            for (int i = idlePlayers.Count - teamSize * 2; i >= 0; i--)
+            {
+                var batch = idlePlayers.GetRange(i, teamSize * 2);
+
+                var result = GetTeams(batch);
+                if (result.Bool)
+                {
+                    team1 = result.team1;
+                    team2 = result.team2;
+                    UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
+
+                    flip = false;
+                    usingSorting++;
+
+                    return true;
+                }
+            }
+
+            flip = false;
         }
 
-        int maxAttempts = (int)((pool.Count * 0.2) + pool.Count);
-
+        //sorting has failed, try random sample
+        var idlePlayersShuffled = ShuffleCopy(idlePlayers);
+        int maxAttempts = idlePlayersShuffled.Count * 3;
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             HashSet<int> selectedIndices = new();
 
             // Select 2 * teamSize unique indices randomly from the idlePlayers list
-            while (selectedIndices.Count < totalRequired)
+            while (selectedIndices.Count < teamSize * 2)
             {
-                int randIndex = rng.Next(idlePlayers.Count);
+                int randIndex = rng.Next(idlePlayersShuffled.Count);
                 selectedIndices.Add(randIndex);
             }
 
             // Convert to list for indexing
-            var selectedPlayers = selectedIndices.Select(i => idlePlayers[i]).ToList();
+            var selectedPlayers = selectedIndices.Select(i => idlePlayersShuffled[i]).ToList();
 
             // Shuffle the selected players (small list, so fast)
             for (int i = selectedPlayers.Count - 1; i > 0; i--)
@@ -718,39 +886,109 @@ public class EloSystemManager : MonoBehaviour
                 (selectedPlayers[i], selectedPlayers[j]) = (selectedPlayers[j], selectedPlayers[i]);
             }
 
-            // Split into two teams
-            var t1 = selectedPlayers.Take(teamSize).ToList();
-            var t2 = selectedPlayers.Skip(teamSize).Take(teamSize).ToList();
-
-            float avgElo1 = t1.Average(p => (float)p.playerData.Elo);
-            float avgElo2 = t2.Average(p => (float)p.playerData.Elo);
-
-            if (Mathf.Abs(avgElo1 - avgElo2) <= eloThreshold)
+            var getTeams = GetTeams(selectedPlayers);
+            if (getTeams.Bool)
             {
-                team1 = t1;
-                team2 = t2;
-
+                team1 = getTeams.team1;
+                team2 = getTeams.team2;
                 UpdatePlayerStatusForBothTeams(ref team1, ref team2, true);
 
-                if (logTeams)
-                {
-                    Debug.Log($"Fair match found! Elo diff: {Mathf.Abs(avgElo1 - avgElo2)}");
-                    Debug.Log("Team 1: Elo: " + avgElo1);
-                    Debug.Log("Team 2: Elo: " + avgElo2);
-                }
+                usingRandomSampling++;
 
                 return true;
             }
-
-            //// Let Unity breathe
-            //if (attempt % 10 == 0)
-            //    await Task.Yield();
         }
 
-        Debug.LogWarning("No fair team found after 10,000 random samples.");
         return false;
     }
 
+    (bool Bool, List<Player> team1, List<Player> team2) GetTeams(List<Player> somePlayers)
+    {
+        var allTeams = GenerateAllPossibleCombinations(somePlayers, teamSize);
+
+        foreach (var teamPair in allTeams)
+        {
+            float avgT1 = teamPair.team1.Average(p => (float)p.playerData.Elo);
+            float avgT2 = teamPair.team2.Average(p => (float)p.playerData.Elo);
+
+            if (Mathf.Abs(avgT1 - avgT2) <= eloThreshold)
+                return (true, teamPair.team1, teamPair.team2);
+        }
+
+        return (false, null, null);
+    }
+
+    public struct AllTeams
+    {
+        public List<Player> team1;
+        public List<Player> team2;
+
+        public AllTeams(List<Player> t1, List<Player> t2)
+        {
+            team1 = t1;
+            team2 = t2;
+        }
+    }
+
+
+    public List<AllTeams> GenerateAllPossibleCombinations(List<Player> somePlayers, int teamSize)
+    {
+        if (somePlayers.Count < teamSize * 2)
+            throw new ArgumentException($"List size must be more than {teamSize * 2}");
+
+        var results = new List<AllTeams>();
+        var uniquePairs = new HashSet<string>();
+
+        foreach (var team1 in GetCombinations(somePlayers, teamSize))
+        {
+            var team2Candidates = somePlayers.Except(team1).ToList();
+
+            if (team2Candidates.Count >= teamSize)
+            {
+                foreach (var team2 in GetCombinations(team2Candidates, teamSize))
+                {
+                    // Create a canonical key using sorted IDs
+                    var t1Ids = team1.Select(p => p.playerData.Id).OrderBy(id => id);
+                    var t2Ids = team2.Select(p => p.playerData.Id).OrderBy(id => id);
+
+                    string team1Key = string.Join(",", t1Ids);
+                    string team2Key = string.Join(",", t2Ids);
+
+                    // Sort both team keys to ensure mirror pairs are treated the same
+                    var key = string.Compare(team1Key, team2Key) < 0 ?
+                              $"{team1Key}|{team2Key}" :
+                              $"{team2Key}|{team1Key}";
+
+                    if (!uniquePairs.Contains(key))
+                    {
+                        uniquePairs.Add(key);
+                        results.Add(new AllTeams(new List<Player>(team1), new List<Player>(team2)));
+                    }
+                }
+            }
+        }
+
+        return results;
+    }
+
+    // Helper function for combinations
+    IEnumerable<List<T>> GetCombinations<T>(List<T> list, int k, int start = 0)
+    {
+        if (k == 0)
+        {
+            yield return new List<T>();
+        }
+        else
+        {
+            for (int i = start; i <= list.Count - k; i++)
+            {
+                foreach (var tail in GetCombinations(list, k - 1, i + 1))
+                {
+                    yield return new List<T> { list[i] }.Concat(tail).ToList();
+                }
+            }
+        }
+    }
 
     //earlier approaches used this method, but it was not efficient for larger pools
     //now we just use a random sampling approach based on attempts rather than creating every single possible combination of players

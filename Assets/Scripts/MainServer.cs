@@ -150,6 +150,13 @@ public class MainServer : MonoBehaviour
         switch (_systemIndex)
         {
             case 0: //Elo
+                var esm = EloSystemManager.instance;
+
+                esm.newPlayerRating = float.Parse(UIManager.instance.NewPlayerRating.GetComponent<TMP_InputField>().text);
+                esm.isNewPlayerSmurf = UIManager.instance.NewPlayerSmurfCheckbox.GetComponent<Toggle>().isOn;
+
+                esm.AddAPlayer();
+
                 break;
 
             case 1: //Glicko
