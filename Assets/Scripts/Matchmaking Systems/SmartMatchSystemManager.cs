@@ -191,7 +191,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         totalPlayers++;
         cp.totPlayers++;
 
-        UIManager.instance.CancelAddPlayer();
+        UIManager.instance.CancelAddPlayerUI();
     }
 
     int MPP_loc = 0;
@@ -399,7 +399,7 @@ public class SmartMatchSystemManager : MonoBehaviour
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,KDA,Kills,Deaths,ClutchRatio,AssistRatio,CS,RealSkill,PMHistory,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
+        csvContent.AppendLine("PlayerID,KDR,Kills,Deaths,ClutchRatio,AssistRatio,CS,RealSkill,PMHistory,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,CSHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
 
         string MSEListStr = string.Join(";", MSEs);
         string smurfListStr = string.Join(";", smurfPlayerIDs);

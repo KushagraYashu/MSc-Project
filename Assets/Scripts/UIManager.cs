@@ -48,11 +48,11 @@ public class UIManager : MonoBehaviour
 
     private double _We = 01.00;
     private double _Wk = 11.00;
-    private double _Wa = 06.00;
+    private double _Wa = 05.00;
     private double _Wc = 07.00;
-    private double _Wx = 00.50;
+    private double _Wx = 00.25;
 
-    private float _maxExpPoints = 100;
+    private float _maxExpPoints = 200;
     private bool _limitExp = true;
     private bool _limitRatingPoints = true;
 
@@ -111,6 +111,10 @@ public class UIManager : MonoBehaviour
         {
             UpdateUIForSmartSystemConfigurations();
             _smartSystemConfigurablesScreenGO.SetActive(true);
+        }
+        else
+        {
+            _smartSystemConfigurablesScreenGO.SetActive(false);
         }
     }
 
@@ -184,7 +188,7 @@ public class UIManager : MonoBehaviour
             case 2: //vanilla trueskill (moserware)
                 pool = VanillaTrueskillSystemManager.instance.poolPlayersList[poolIndex].playersInPool;
                 snapshot = new List<Player>(pool.Where(p => p != null));
-                snapshot = snapshot.OrderBy(p => p.playerData.Id).ThenBy(p => VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating)).ToList();
+                snapshot = snapshot.OrderBy(p => p.playerData.Id).ThenBy(p => VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyScale)).ToList();
                 break;
 
             case 3: //smart match
@@ -227,7 +231,7 @@ public class UIManager : MonoBehaviour
                     break;
 
                 case 2: //vanilla trueskill (moserware)
-                    allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F4");
+                    allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyScale).ToString("F4");
                     break;
 
                 case 3: //smart match
@@ -288,7 +292,7 @@ public class UIManager : MonoBehaviour
                         break;
 
                     case 2: //vanilla trueskill (moserware)
-                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F4");
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyScale).ToString("F4");
                         break;
 
                     case 3: //smart match
@@ -350,7 +354,7 @@ public class UIManager : MonoBehaviour
                         break;
 
                     case 2: //vanilla trueskill (moserware)
-                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F4");
+                        allShowBoxes[i].eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyScale).ToString("F4");
                         break;
 
                     case 3: //smart match
@@ -401,7 +405,7 @@ public class UIManager : MonoBehaviour
         _addPlayerScreenGO.SetActive(true);
     }
 
-    public void CancelAddPlayer()
+    public void CancelAddPlayerUI()
     {
         _addPlayerScreenGO.SetActive(false);
         _newPlayerSmurfCheckboxGO.GetComponent<Toggle>().isOn = false;

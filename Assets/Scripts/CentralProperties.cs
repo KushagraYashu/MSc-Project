@@ -20,10 +20,17 @@ public class CentralProperties : MonoBehaviour
 
     public float[] playerDistributionInPools;
 
+    public float minGlobalRating;
+
+    public float maxGlobalRating;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         totSmurfs = Mathf.CeilToInt(0.01f * totPlayers);  //1 percent of players are smurfs
+
+        minGlobalRating = eloRangePerPool[0].x;
+        maxGlobalRating = eloRangePerPool[totPools - 1].y;
     }
 
     // Update is called once per frame
