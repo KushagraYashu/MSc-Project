@@ -28,7 +28,7 @@ public class PlayerShowBox : MonoBehaviour
                 break;
 
             case 2: //vanilla trueskill (moserware)
-                this.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F4");
+                this.eloTxtGO.GetComponent<TMPro.TMP_Text>().text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyScale).ToString("F4");
                 break;
 
             case 3: //smart match

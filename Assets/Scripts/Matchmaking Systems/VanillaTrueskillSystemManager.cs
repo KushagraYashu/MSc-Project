@@ -9,8 +9,6 @@ using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEngine;
-using static PlayerData;
-using static SmartMatchSystemManager;
 
 public class VanillaTrueskillSystemManager : MonoBehaviour
 {
@@ -108,7 +106,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         double mean = (min + max) / 2.0;
         double stdDev = (max - min) / 6.0; // ~99.7% of values fall within range
 
-        while (true)
+        while (true)    //not clamping values, to preserve bell shaped nature
         {
             double u1 = 1.0 - rng.NextDouble(); // avoid 0
             double u2 = 1.0 - rng.NextDouble();
@@ -128,23 +126,37 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         return UnityEngine.Random.Range(top5PercentileMin, max);
     }
 
-    public enum RatingConversion
+    public enum RatingConversion    //helper enum for rating conversions
     {
         None,
         To_TrueSkill,
-        To_MyRating,
+        To_MyScale,
     }
-    public float ConvertRating(float rating, float min, float max, RatingConversion conversionType)
+    //scaling of trueskill values to my scale
+    public float ConvertRating(float rating, float min, float max, RatingConversion conversionType, bool clamped = true)
     {
         float trueSkillMin = 0f;
         float trueSkillMax = 50f;
 
-        if (conversionType == RatingConversion.To_TrueSkill)
-            return trueSkillMin + ((rating - min) / (max - min)) * (trueSkillMax - trueSkillMin);
-        else if (conversionType == RatingConversion.To_MyRating)
-            return min + ((rating - trueSkillMin) / (trueSkillMax - trueSkillMin)) * (max - min);
+        if (clamped)
+        {
+            if (conversionType == RatingConversion.To_TrueSkill)
+                return Mathf.Clamp(
+                    trueSkillMin + ((rating - min) / (max - min)) * (trueSkillMax - trueSkillMin),
+                    trueSkillMin, trueSkillMax);
+            else if (conversionType == RatingConversion.To_MyScale)
+                return Mathf.Clamp(
+                    min + ((rating - trueSkillMin) / (trueSkillMax - trueSkillMin)) * (max - min),
+                    min, max);
+        }
         else
-            return -1;
+        {
+            if (conversionType == RatingConversion.To_TrueSkill)
+                return trueSkillMin + ((rating - min) / (max - min)) * (trueSkillMax - trueSkillMin);
+            else if (conversionType == RatingConversion.To_MyScale)
+                return min + ((rating - trueSkillMin) / (trueSkillMax - trueSkillMin)) * (max - min);
+        }
+        return -1;
     }
 
     int totalPlayers = 0;
@@ -183,8 +195,8 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
                 newPlayer.muHistory.Add(newPlayer.playerData.TrueSkillRating.Mean);
                 newPlayer.sigmaHistory.Add(newPlayer.playerData.TrueSkillRating.StandardDeviation);
-                newPlayer.conservativeValHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
-                newPlayer.scaledRatingHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+                newPlayer.conservativeValHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
+                newPlayer.scaledRatingHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
 
                 newPlayer.poolHistory.Add(i);
 
@@ -200,7 +212,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         totalPlayers++;
         cp.totPlayers++;
 
-        UIManager.instance.CancelAddPlayer();
+        UIManager.instance.CancelAddPlayerUI();
     }
 
     int MPP_loc = 0;
@@ -237,7 +249,10 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             {
                 Player newPlayer = new();
 
-                float rating = UnityEngine.Random.Range(minElo, maxElo);
+                //starting player with a random value in the pool range (only in trueskill) because trueskill depends heavily on mean value for updates and giving everyone the same rating would lead to a very slow convergence
+                //float rating = UnityEngine.Random.Range(minElo, maxElo);
+
+                float rating = minElo + 50; //experimenting
 
                 float realSkill = 0;
                 int ID = MainServer.instance.GenerateRandomID(maxAttempts, maxIDs);
@@ -261,8 +276,8 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
                 newPlayer.muHistory.Add(newPlayer.playerData.TrueSkillRating.Mean);
                 newPlayer.sigmaHistory.Add(newPlayer.playerData.TrueSkillRating.StandardDeviation);
-                newPlayer.conservativeValHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
-                newPlayer.scaledRatingHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+                newPlayer.conservativeValHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
+                newPlayer.scaledRatingHistory.Add(ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
 
                 //Debug.LogError($"{newPlayer.playerData.TrueSkillRating.Mean}\n{newPlayer.playerData.TrueSkillRating.ConservativeRating}\n{ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating)}\n{ConvertRating((float)newPlayer.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating)}");
 
@@ -300,7 +315,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             var pool = poolPlayersList[i].playersInPool;
             for (int j = 0; j < pool.Count; j++)
             {
-                float elo = (float)ConvertRating((float)pool[j].playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating);
+                float elo = (float)ConvertRating((float)pool[j].playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale);
                 float realSkill = (float)pool[j].playerData.RealSkill;
                 float error = elo - realSkill;
 
@@ -379,6 +394,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         }
 
         StartCoroutine(CalculateMSE());
+        minMatchPerPlayerText.text = MPP_loc.ToString();
 
         Debug.Log($"All players in all pools have completed their required matches. Total matches: {totalMatchesSimulated}");
 
@@ -403,11 +419,10 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         int processedPlayers = 0;
 
         // CSV Header (Columns)
-        csvContent.AppendLine("PlayerID,ConservativeRating,ScaledRating,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,MuHistory,SigmaHistory,ConservativeRatingHistory,ScaledRatingHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
+        csvContent.AppendLine("PlayerID,KDR,Kills,Deaths,ClutchRatio,AssistRatio,ConservativeRating,ScaledRating,RealSkill,Pool,TotalDelta,GamesPlayed,Wins,Outcomes,MuHistory,SigmaHistory,ConservativeRatingHistory,ScaledRatingHistory,PoolHistory,MSE-List,Smurfs-List,TotalMatchesSimulated");
 
         string MSEListStr = string.Join(";", MSEs);
         string smurfListStr = string.Join(";", smurfPlayerIDs);
-
 
         for (int i = 0; i < allPlayers.Count; ++i)
         {
@@ -418,10 +433,11 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             string muHistoryStr = string.Join(";", player.muHistory);
             string sigmaHistoryStr = string.Join(";", player.sigmaHistory);
             string scaledRatingHistoryStr = string.Join(";", player.scaledRatingHistory);
+            string outcomeHistoryStr = string.Join(";", player.playerData.Outcomes);
             string poolHistoryStr = string.Join(";", player.poolHistory);
 
             // Build CSV row
-            string line = $"{player.playerData.Id},{player.playerData.TrueSkillRating.ConservativeRating},{ConvertRating((float)player.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating)},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{muHistoryStr}\",\"{sigmaHistoryStr}\",\"{conservativeRatingHistoryStr}\",\"{scaledRatingHistoryStr}\",\"{poolHistoryStr}\",";
+            string line = $"{player.playerData.Id},{player.playerData.KDR},{player.playerData.Kills},{player.playerData.Deaths},{player.playerData.ClutchRatio},{player.playerData.AssistRatio},{ConvertRating((float)player.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale)},{ConvertRating((float)player.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale)},{player.playerData.RealSkill},{player.playerData.Pool},{player.totalChangeFromStart},{player.playerData.GamesPlayed},{player.playerData.Wins},\"{outcomeHistoryStr}\",\"{muHistoryStr}\",\"{sigmaHistoryStr}\",\"{conservativeRatingHistoryStr}\",\"{scaledRatingHistoryStr}\",\"{poolHistoryStr}\",";
 
             if (i == 0)
             {
@@ -494,7 +510,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Could not find suitable teams, trying again with merging another pool");
+            Debug.LogError($"Could not find suitable teams in {whichPool}, trying again with merging another pool");
             var combinedPool = new List<Player>(poolPlayersList[whichPool].playersInPool);
             if (whichPool > 0)
             {
@@ -572,6 +588,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
                 Player p1 = aliveTeam1[0];
                 Player p2 = aliveTeam2[0];
 
+                //using elo-based probability for win chance, but using realskill rather than trueskill value to predict winner, because in the game winning depends on the player's skill, not the system's
                 double p1WinProb = 1.0 / (1.0 + Math.Pow(10, (p2.playerData.RealSkill - p1.playerData.RealSkill) / 400.0));
 
                 bool p1Wins = rng.NextDouble() < p1WinProb;
@@ -582,6 +599,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
                 if (p1Wins)
                 {
+                    //match statistics (that trueskill doesnt care for)
                     p1.playerData.Kills++;
                     p2.playerData.Deaths++;
 
@@ -694,6 +712,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             winner = 2;
         }
 
+        //all trueskill cares for is who won
         UpdateTrueskill(ref team1, ref team2, winner);
 
         foreach (var p in team1)
@@ -722,7 +741,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     void CheckRankDerank(Player p)
     {
         int currentPool = p.playerData.Pool;
-        double elo = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating);
+        double elo = ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale);
 
         int newPool = -1;
         var cp = CentralProperties.instance;
@@ -816,14 +835,15 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         {
             p.playerData.TrueSkillRating = newRatings[p];
 
-            var scaledRating = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating);
+            //clamping
+            var scaledRating = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale);
             scaledRating = Mathf.Clamp(scaledRating, minEloGlobal, maxEloGlobal);
             p.playerData.TrueSkillRating = new(ConvertRating(scaledRating, minEloGlobal, maxEloGlobal, RatingConversion.To_TrueSkill), p.playerData.TrueSkillRating.StandardDeviation);
 
             p.muHistory.Add(p.playerData.TrueSkillRating.Mean);
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
-            p.conservativeValHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
-            p.scaledRatingHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+            p.conservativeValHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
+            p.scaledRatingHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
 
             UIManager.instance.UpdateBoxContent(p);
 
@@ -833,14 +853,15 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         {
             p.playerData.TrueSkillRating = newRatings[p];
 
-            var scaledRating = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating);
+            //clamping
+            var scaledRating = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale);
             scaledRating = Mathf.Clamp(scaledRating, minEloGlobal, maxEloGlobal);
             p.playerData.TrueSkillRating = new(ConvertRating(scaledRating, minEloGlobal, maxEloGlobal, RatingConversion.To_TrueSkill), p.playerData.TrueSkillRating.StandardDeviation);
 
             p.muHistory.Add(p.playerData.TrueSkillRating.Mean);
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
-            p.conservativeValHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
-            p.scaledRatingHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+            p.conservativeValHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
+            p.scaledRatingHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
 
             UIManager.instance.UpdateBoxContent(p);
 
@@ -855,11 +876,11 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     bool flip = false;
     public bool TrySplitFairTeamsAsync(List<Player> pool, ref List<Player> team1, ref List<Player> team2)
     {
-        //players available for matching must be IDLE
+        //players available for matching must be IDLE and total played matches must be less than 3 times the total matches required (limiting the max matches played to force the system to converge)
         var idlePlayers = pool
                             .Where(p => p.playerState == Player.PlayerState.Idle && p.playerData.GamesPlayed < totalMatches * 3)
                             .OrderBy(p => p.playerData.GamesPlayed)
-                            .ThenBy(p => p.playerData.TrueSkillRating.Mean)
+                            .ThenBy(p => p.playerData.TrueSkillRating.ConservativeRating)
                             .ToList();
 
         if (idlePlayers.Count < teamSize * 2) return false;
@@ -956,14 +977,27 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
         foreach(var teamPair in allTeams)
         {
-            float avgT1 = teamPair.team1.Average(p => (float)ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
-            float avgT2 = teamPair.team2.Average(p => (float)ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyRating));
+            float avgT1 = teamPair.team1.Average(p => (float)ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
+            float avgT2 = teamPair.team2.Average(p => (float)ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
 
+            //using a threshold mechanism to match players rather than trueskill's match quality thing
             if (Mathf.Abs(avgT1 - avgT2) <= matchingThreshold)
                 return (true, teamPair.team1, teamPair.team2);
         }
 
         return (false, null, null);
+    }
+
+    public struct AllTeams
+    {
+        public List<Player> team1;
+        public List<Player> team2;
+
+        public AllTeams(List<Player> t1, List<Player> t2)
+        {
+            team1 = t1;
+            team2 = t2;
+        }
     }
 
     public List<AllTeams> GenerateAllPossibleCombinations(List<Player> somePlayers, int teamSize)
@@ -1022,31 +1056,6 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
                     yield return new List<T> { list[i] }.Concat(tail).ToList();
                 }
             }
-        }
-    }
-
-    //earlier approaches used this method, but it was not efficient for larger pools
-    //now we just use a random sampling approach based on attempts rather than creating every single possible combination of players
-    private List<List<T>> GenerateCombinations<T>(List<T> list, int comboSize)
-    {
-        List<List<T>> result = new List<List<T>>();
-        GenerateCombinationsRecursive(list, comboSize, 0, new List<T>(), result);
-        return result;
-    }
-
-    private void GenerateCombinationsRecursive<T>(List<T> list, int comboSize, int start, List<T> current, List<List<T>> result)
-    {
-        if (current.Count == comboSize)
-        {
-            result.Add(new List<T>(current));
-            return;
-        }
-
-        for (int i = start; i < list.Count; i++)
-        {
-            current.Add(list[i]);
-            GenerateCombinationsRecursive(list, comboSize, i + 1, current, result);
-            current.RemoveAt(current.Count - 1);
         }
     }
 }

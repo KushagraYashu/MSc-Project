@@ -108,6 +108,7 @@ public class PlayerData
         set { _trueSkillRating = value; }
     }
     
+
     public int Pool
     {
         get { return _pool; }
@@ -128,12 +129,18 @@ public class PlayerData
 
     public double AssistRatio
     {
-        get { return _assistRatio; }
+        get { 
+            UpdateAssistRatio();
+            return _assistRatio; 
+        }
     }
 
     public double ClutchRatio
     {
-        get { return _clutchRatio; }
+        get {
+            UpdateClutchRatio();
+            return _clutchRatio;
+        }
     }
 
     public uint Deaths
@@ -414,13 +421,14 @@ public class PlayerData
 
     public float CalculateMatchPerformance()
     {
-        float KDRratio = 0;
-        float assistRatio = 0;
-        float clutchRatio = 0;
+        float KDRratio;
+        float assistRatio;
+        float clutchRatio;
+
         if (_KDR != 0)
-            KDRratio = (float)(thisMatchKDR / _KDR);
+            KDRratio = Mathf.Clamp((float)(thisMatchKDR / _KDR), 0, 1.75f);
         else
-            KDRratio = thisMatchKDR;
+            KDRratio = Mathf.Clamp(thisMatchKDR, 0, 1.75f);
         if (_assistRatio != 0)
             assistRatio = (float)(thisMatchAssistRatio / _assistRatio);
         else
@@ -430,6 +438,6 @@ public class PlayerData
         else
             clutchRatio = thisMatchClutchRatio;
 
-        return Mathf.Clamp(KDRratio + assistRatio + clutchRatio, 0.8f, 2f);
+        return Mathf.Clamp(KDRratio + assistRatio + clutchRatio, 0.8f, 2.0f);
     }
 }

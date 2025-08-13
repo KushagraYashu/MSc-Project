@@ -25,12 +25,12 @@ public class PlayerDetailsPanel : MonoBehaviour
                 break;
 
             case 2: //vanilla trueskill (moserware)
-                GetComponent<GraphMaker>().ShowGraph(p.scaledRatingHistory);
-                ratingText.text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.Mean, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyRating).ToString("F6");
+                GetComponent<GraphMaker>().ShowGraph(p.conservativeValHistory);
+                ratingText.text = VanillaTrueskillSystemManager.instance.ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, CentralProperties.instance.eloRangePerPool[0].x, CentralProperties.instance.eloRangePerPool[CentralProperties.instance.totPools - 1].y, VanillaTrueskillSystemManager.RatingConversion.To_MyScale).ToString("F6");
                 break;
 
             case 3: //smart match
-                GetComponent<GraphMaker>().ShowGraph(p.EloHistory);
+                GetComponent<GraphMaker>().ShowGraph(p.EloHistory); //elo history stores CS values (should've created a separate list but whatever)
                 ratingText.text = p.playerData.CompositeSkill.ToString("F6");
                 break;
         }
