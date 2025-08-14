@@ -10044,9 +10044,12 @@ MonoBehaviour:
   totalMatches: 100
   maxRoundsPerMatch: 3
   teamSize: 5
-  eloThreshold: 50
+  eloThreshold: 25
   logTeams: 1
+  minMatchPerPlayerText: {fileID: 681346119}
   poolPlayersList: []
+  newPlayerRating: 0
+  isNewPlayerSmurf: 0
 --- !u!1 &382523196
 GameObject:
   m_ObjectHideFlags: 0

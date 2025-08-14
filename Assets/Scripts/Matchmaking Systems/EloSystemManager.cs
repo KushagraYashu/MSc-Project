@@ -811,7 +811,7 @@ public class EloSystemManager : MonoBehaviour
         var idlePlayers = pool
                             .Where(p => p.playerState == Player.PlayerState.Idle && p.playerData.GamesPlayed < totalMatches * 3)
                             .OrderBy(p => p.playerData.GamesPlayed)
-                            .ThenBy(p => p.playerData.CompositeSkill)
+                            .ThenBy(p => p.playerData.Elo)
                             .ToList();
 
         if (idlePlayers.Count < teamSize * 2) return false;

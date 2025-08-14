@@ -160,6 +160,12 @@ public class MainServer : MonoBehaviour
                 break;
 
             case 1: //Glicko
+                var gsm = GlickoSystemManager.instance;
+
+                gsm.newPlayerRating = float.Parse(UIManager.instance.NewPlayerRating.GetComponent<TMP_InputField>().text);
+                gsm.isNewPlayerSmurf = UIManager.instance.NewPlayerSmurfCheckbox.GetComponent<Toggle>().isOn;
+
+                gsm.AddAPlayer();
                 break;
 
             case 2: //Vanilla TrueSkill (Moserware)
