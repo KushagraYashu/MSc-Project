@@ -45,6 +45,10 @@ public class MainServer : MonoBehaviour
     [SerializeField] private int _systemIndex;
     [SerializeField] private int _matchesPerPlayer;
 
+    [Header("Verification & main UI")]
+    public GameObject verificationScreen;
+    public GameObject firstScreen;
+
     public int SystemIndex
     {
         get { return _systemIndex; }
@@ -65,6 +69,32 @@ public class MainServer : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+    }
+
+    public void RunSetVerifications()
+    {
+        firstScreen.SetActive(false);
+        verificationScreen.SetActive(true);
+
+        //Elo
+
+        //Example 1: Player A with rating 1855 plays against Player B with rating 1889, A wins and both players have K = 20.
+        //FIDE Calculator says: A will gain 11 points, and B will lose 11 points. (keep in mind, FIDE does not allow for fractional ratings, so result is rounded off)
+        EloSystemManager.instance.UpdateEloForPlayer(verification: true, playerA: 1855f, playerB: 1889, resultInFavourofA: 1, vK: 20, exNo: 1);
+        //Example 2: Player A with rating 2552 plays against Player B with rating 2440, B wins and both players have K = 10.
+        //FIDE Calculator says: A will gain 11 points, and B will lose 11 points. (keep in mind, FIDE does not allow for fractional ratings, so result is rounded off)
+        EloSystemManager.instance.UpdateEloForPlayer(verification: true, playerA: 2552f, playerB: 2440f, resultInFavourofA: 0, vK: 10, exNo: 2);
+
+
+        //Glicko
+
+
+    }
+
+    public void GoBackToFirstScreen()
+    {
+        verificationScreen.SetActive(false);
+        firstScreen.SetActive(true);
     }
 
     public void StartSimulation()

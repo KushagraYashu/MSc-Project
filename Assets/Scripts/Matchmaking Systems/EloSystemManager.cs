@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using TMPro;
+using Unity.Collections;
 using UnityEngine;
 using static VanillaTrueskillSystemManager;
 
@@ -25,6 +26,9 @@ public class EloSystemManager : MonoBehaviour
     public int maxRoundsPerMatch;
     public int teamSize = 5;
     public float eloThreshold = 10f;
+
+    [Header("Verification")]
+    public TMP_Text[] answerTexts;
 
     //teams are now handled matchwise, that will make the matches be able to run simultaneously.
     //[Header("Teams")]
@@ -759,12 +763,33 @@ public class EloSystemManager : MonoBehaviour
         }
     }
 
-    void UpdateEloForPlayer(int team, Player p, int winner, float expectedScore)
+    //method signature updated to include verification process
+    public void UpdateEloForPlayer(int team = -1, Player p = null, int winner = -1, float expectedScore = -1, bool verification = false, float playerA = 0f, float playerB = 0f, int resultInFavourofA = -1, int vK = -1, int exNo = -1)
     {
+        //verification
+        if (verification)
+        {
+            float expectedResultA = (float)(1.0f / (1.0f + Math.Pow(10, (playerB - playerA) / 400.0f)));
+            float expectedResultB = (float)(1.0 - expectedResultA);
+
+            float deltaA = vK * (resultInFavourofA - expectedResultA);
+            float deltaB = vK * ((1 - resultInFavourofA) - expectedResultB);
+
+            playerA += deltaA;
+            playerB += deltaB;
+
+            answerTexts[exNo - 1].text = $"Elo Implementation says, player A will recieve {deltaA.ToString("F2")} points, and B will recieve {deltaB.ToString("F2")} points.";
+
+            return;
+        }
+
+
+        //normal usage
+
         int K;
 
         //K value inspired by FIDE (Federation Internationale des Echecs or World Chess Federation) regulations
-        if (p.playerData.GamesPlayed <= 30 && p.playerData.CompositeSkill < 2300)
+        if (p.playerData.GamesPlayed <= 30 && p.playerData.Elo < 2300)
             K = 40;
         else
         {
@@ -782,9 +807,7 @@ public class EloSystemManager : MonoBehaviour
             p.playerData.Outcomes.Add(1);
         }
         else
-        {
             p.playerData.Outcomes.Add(0);
-        }
 
         double delta = K * (actualResult - expectedScore);
         p.playerData.Elo += delta;
@@ -796,8 +819,6 @@ public class EloSystemManager : MonoBehaviour
         p.totalChangeFromStart += (float)delta;
 
         UIManager.instance.UpdateBoxContent(p);
-
-        //Debug.Log($"Team {team}\nPlayer {p.playerData.Id} (Pool {poolIndex}) Elo updated: {p.playerData.Elo} (Delta: {delta})");
     }
 
     int usingSorting = 0;
