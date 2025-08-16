@@ -26,7 +26,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     [Header("Match Properties")]
     public int maxRoundsPerMatch = 3;
     public int teamSize = 5;
-    public float matchingThreshold = 50f;
+    public float qualityThreshold = 0.42f;
 
     //teams are now handled matchwise, that will make the matches be able to run simultaneously.
     //[Header("Teams")]
@@ -975,7 +975,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     {
         var allTeams = GenerateAllPossibleCombinations(somePlayers, teamSize);
 
-        double maxQuality = 0;
+        double maxQuality = qualityThreshold;
         List<Player> bestTeam1 = null;
         List<Player> bestTeam2 = null;
 
@@ -1004,7 +1004,6 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
         if( bestTeam1 != null && bestTeam2 != null)
         {
-            Debug.LogError($"Best Match Quality: {maxQuality}");
             return (true, bestTeam1, bestTeam2);
         }
 
