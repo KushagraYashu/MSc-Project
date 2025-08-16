@@ -975,14 +975,37 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     {
         var allTeams = GenerateAllPossibleCombinations(somePlayers, teamSize);
 
-        foreach(var teamPair in allTeams)
-        {
-            float avgT1 = teamPair.team1.Average(p => (float)ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
-            float avgT2 = teamPair.team2.Average(p => (float)ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
+        double maxQuality = 0;
+        List<Player> bestTeam1 = null;
+        List<Player> bestTeam2 = null;
 
-            //using a threshold mechanism to match players rather than trueskill's match quality thing
-            if (Mathf.Abs(avgT1 - avgT2) <= matchingThreshold)
-                return (true, teamPair.team1, teamPair.team2);
+        foreach (var teamPair in allTeams)
+        {
+            var team1 = new Team<Player>();
+            var team2 = new Team<Player>();
+
+            for (int i = 0; i < teamPair.team1.Count; i++)
+            {
+                team1.AddPlayer(teamPair.team1[i], teamPair.team1[i].playerData.TrueSkillRating);
+                team2.AddPlayer(teamPair.team2[i], teamPair.team2[i].playerData.TrueSkillRating);
+            }
+
+            var BothTeams = Teams.Concat<Player>(team1, team2).ToArray();
+
+            var quality = TrueSkillCalculator.CalculateMatchQuality(defaultGameInfo, BothTeams);
+
+            if (quality > maxQuality)
+            {
+                maxQuality = quality;
+                bestTeam1 = teamPair.team1;
+                bestTeam2 = teamPair.team2;
+            }
+        }
+
+        if( bestTeam1 != null && bestTeam2 != null)
+        {
+            Debug.LogError($"Best Match Quality: {maxQuality}");
+            return (true, bestTeam1, bestTeam2);
         }
 
         return (false, null, null);
