@@ -1,9 +1,12 @@
+using Moserware.Skills;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
+using Unity.Burst.Intrinsics;
 using UnityEngine;
 using UnityEngine.UI;
+//using UnityEngine.UIElements;
 
 public class MainServer : MonoBehaviour
 {
@@ -87,8 +90,34 @@ public class MainServer : MonoBehaviour
 
 
         //Glicko
+        //The system is being compared against the results of a published example (Glickman, 1995)
+        //Suppose a player rated 1500 competes against players rated 1400, 1550 and 1700, winning the first game and losing the next two.Assume the 1500 - rated player’s rating deviation is 200, and his opponents’ are 30, 100 and 300, respectively. (Glickman, 1995).Find its new rating and RD.
+        //Result from the paper: RD’ = 151.4 and R’ = 1464
+        GlickoSystemManager.instance.VerifyGlicko(playerRating: 1500, playerRD: 200, opponentsRatings: new List<float> { 1400, 1550, 1700 }, opponentsRDs: new List<float> { 30, 100, 300 }, outcomes: new List<int> { 1, 0, 0 });
 
 
+        //Vanilla TrueSkill
+        //The system is being compared against another implementation of TrueSkill (https://github.com/sublee/trueskill)
+        //Example 1: Player A: mu=25, sigma=8.333   Player B: mu = 27, sigma = 8.333. Find match quality
+        //Python implementation says: 0.4421
+        var player1TrueSkillRating = new Rating(25, 8.333);
+        var player2TrueSkillRating = new Rating(27, 8.333);
+        Team Team1 = new(new Moserware.Skills.Player("player 1"), player1TrueSkillRating);
+        Team Team2 = new(new Moserware.Skills.Player("player 2"), player2TrueSkillRating);
+        VanillaTrueskillSystemManager.instance.VerifyTrueSkillSystem(Team1, Team2);
+        // Example 2: Team 1: Player A(mu= 30, sigma= 7), Player B(mu= 20, sigma= 8.333), Team 2: Player C(mu= 25, sigma=2), Player D(mu= 25, sigma=5). Find Match Quality
+        //Python implementation says: 0.5658
+        var playerATrueSkillRating = new Rating(30, 7);
+        var playerBTrueSkillRating = new Rating(20, 8.333);
+        var playerCTrueSkillRating = new Rating(25, 2);
+        var playerDTrueSkillRating = new Rating(25, 5);
+        Team1 = new();
+        Team1.AddPlayer(new Moserware.Skills.Player("player A"), playerATrueSkillRating);
+        Team1.AddPlayer(new Moserware.Skills.Player("player B"), playerBTrueSkillRating);
+        Team2 = new();
+        Team2.AddPlayer(new Moserware.Skills.Player("player C"), playerCTrueSkillRating);
+        Team2.AddPlayer(new Moserware.Skills.Player("player D"), playerDTrueSkillRating);
+        VanillaTrueskillSystemManager.instance.VerifyTrueSkillSystem(Team1, Team2);
     }
 
     public void GoBackToFirstScreen()

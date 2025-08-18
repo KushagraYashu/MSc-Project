@@ -28,6 +28,9 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
     public int teamSize = 5;
     public float qualityThreshold = 0.42f;
 
+    [Header("Verification")]
+    public TMP_Text[] answerTexts;
+
     //teams are now handled matchwise, that will make the matches be able to run simultaneously.
     //[Header("Teams")]
     //public List<Player> team1 = new();
@@ -787,6 +790,17 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
         }
     }
 
+    int exNo = 0;
+    public void VerifyTrueSkillSystem(Team team1, Team team2)
+    {
+        var BothTeams = Teams.Concat(team1, team2).ToArray();
+        var quality = TrueSkillCalculator.CalculateMatchQuality(defaultGameInfo, BothTeams);
+
+        answerTexts[exNo % answerTexts.Count()].text = $"This TrueSkill Implementation Says MatchQuality is: {quality:F4}";
+
+        exNo++;
+    }
+
     void UpdateTrueskill(ref List<Player> team1Players, ref List<Player> team2Players, int winner)
     {
         var team1 = new Team<Player>();
@@ -833,6 +847,8 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
 
         foreach(var p in team1Players)
         {
+            var oldRating = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale);
+
             p.playerData.TrueSkillRating = newRatings[p];
 
             //clamping
@@ -844,6 +860,10 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
             p.sigmaHistory.Add(p.playerData.TrueSkillRating.StandardDeviation);
             p.conservativeValHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.ConservativeRating, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
             p.scaledRatingHistory.Add(ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale));
+
+            var updatedRating = ConvertRating((float)p.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale);
+
+            p.totalChangeFromStart += updatedRating - oldRating;
 
             UIManager.instance.UpdateBoxContent(p);
 

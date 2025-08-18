@@ -25,6 +25,9 @@ public class GlickoSystemManager : MonoBehaviour
     public int teamSize = 5;
     public float eloThreshold = 50f;
 
+    [Header("Verification")]
+    public TMP_Text answerTexts;
+
     //teams are now handled matchwise, that will make the matches be able to run simultaneously.
     //[Header("Teams")]
     //public List<Player> team1 = new();
@@ -772,7 +775,7 @@ public class GlickoSystemManager : MonoBehaviour
         }
     }
 
-    double q = Mathf.Log(10) / 400f;
+    double q = 0.0057565;
     void UpdateGlickoForPlayer(int team, Player p, List<Player> otherTeam, int winner)
     {
         double R0 = p.playerData.Elo;
@@ -824,15 +827,45 @@ public class GlickoSystemManager : MonoBehaviour
         //Debug.Log($"Team {team} - Player {p.playerData.Id} Elo: {newRating:F2} (Delta: {delta:F2}), New RD: {newRD:F2}");
     }
 
+    public void VerifyGlicko(float playerRating, float playerRD, List<float> opponentsRatings, List<float> opponentsRDs, List<int> outcomes)
+    {
+        var R0 = playerRating;
+        var RD = playerRD;
+
+        double dSqDenom = 0;
+        for (int i = 0; i < opponentsRatings.Count(); i++)
+        {
+            dSqDenom += Math.Pow(GRDi(opponentsRDs[i]), 2) * ER0RiRDi(opponentsRDs[i], R0, opponentsRatings[i]) * (1 - ER0RiRDi(opponentsRDs[i], R0, opponentsRatings[i]));
+        }
+        dSqDenom = dSqDenom * q * q;
+        double dSquared = 1 / dSqDenom;
+
+        double preFactor = q / (1.0 / (RD * RD) + 1.0 / dSquared);
+
+        double delta = 0;
+        for (int i = 0; i < opponentsRatings.Count(); i++)
+        {
+            delta += GRDi(opponentsRDs[i]) * (outcomes[i] - ER0RiRDi(opponentsRDs[i], R0, opponentsRatings[i]));
+        }
+        delta *= preFactor;
+
+        double newRating = R0 + delta;
+        double newRD = Math.Sqrt(1.0 / (1.0 / (RD * RD) + 1.0 / dSquared));
+
+        answerTexts.text = $"Glicko Implementation Says: New RD: {newRD:F2}\tNew Rating: {newRating:F2}";
+    }
+
     double GRDi(double RDi)
     {
         double a = Mathf.Sqrt((float)(1 + (3 * q * q * RDi * RDi) / (Mathf.PI * Mathf.PI)));
+
         return 1 / a;
     }
 
     double ER0RiRDi(double RDi, double R0, double Ri)
     {
         double a = 1 + Mathf.Pow(10, (float)(((R0 - Ri) * (GRDi(RDi))) / (-400)));
+        
         return 1 / a;
     }
 

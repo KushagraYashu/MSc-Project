@@ -778,7 +778,7 @@ public class EloSystemManager : MonoBehaviour
             playerA += deltaA;
             playerB += deltaB;
 
-            answerTexts[exNo - 1].text = $"Elo Implementation says, player A will receive  {deltaA.ToString("F2")} points, and player B will receive  {deltaB.ToString("F2")} points.";
+            answerTexts[(exNo - 1) % answerTexts.Count()].text = $"Elo Implementation says, player A will receive  {deltaA.ToString("F2")} points, and player B will receive  {deltaB.ToString("F2")} points.";
 
             return;
         }
