@@ -128,6 +128,8 @@ public class MainServer : MonoBehaviour
 
     public void StartSimulation()
     {
+        isSimulationStopped = false;
+
         _systemIndex = UIManager.instance.SystemDropDown.GetComponent<TMP_Dropdown>().value;
         if (UIManager.instance.MPPInputField.GetComponent<TMP_InputField>().text == "")
         {
@@ -204,6 +206,12 @@ public class MainServer : MonoBehaviour
         throw new Exception("ID pool exhausted.");
     }
 
+    public void ResetIDs()
+    {
+        allIDs.Clear();
+        allIDs = new();
+    }
+
     public void AddNewPlayer()
     {
         switch (_systemIndex)
@@ -249,5 +257,50 @@ public class MainServer : MonoBehaviour
         }
     }
 
-    
+    public bool isSimulationStopped = false;
+    public void StopWithSave()
+    {
+        switch (_systemIndex)
+        {
+            case 0: //Elo
+                EloSystemManager.instance.stop = true;
+                EloSystemManager.instance.stopWithSave = true;
+                break;
+
+            case 1: //Glicko
+                GlickoSystemManager.instance.stop = true;
+                GlickoSystemManager.instance.stopWithSave = true;
+                break;
+        }
+
+        isSimulationStopped = true;
+    }
+
+    public void StopWithoutSave()
+    {
+        switch (_systemIndex)
+        {
+            case 0: //Elo
+                EloSystemManager.instance.stop = true;
+                EloSystemManager.instance.doNotSave = true;
+                break;
+
+            case 1: //Glicko
+                GlickoSystemManager.instance.stop = true;
+                GlickoSystemManager.instance.doNotSave = true;
+                break;
+        }
+    }
+
+    public void GoBack()
+    {
+        if (!isSimulationStopped)
+        {
+            StopWithSave();
+        }
+
+        UIManager.instance.SimulationScreen.SetActive(false);
+        UIManager.instance.FirstScreen.SetActive(true);
+    }
+
 }

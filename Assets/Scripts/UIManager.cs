@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -40,6 +41,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject _limitExpCheckboxGO;
     [SerializeField] private GameObject _limitExpInputFieldGO;
     [SerializeField] private GameObject _limitRatingPointsCheckboxGO;
+
+    [SerializeField] private TMP_Text exportStatusText;
+    [SerializeField] private GameObject exportStatusTextParent;
 
     //internal variables
     int showPlayerIndex = 0;
@@ -410,6 +414,20 @@ public class UIManager : MonoBehaviour
         _addPlayerScreenGO.SetActive(false);
         _newPlayerSmurfCheckboxGO.GetComponent<Toggle>().isOn = false;
         _newPlayerRatingGO.GetComponent<TMP_InputField>().text = "";
+    }
+
+    public void ShowExportStatus()
+    {
+        StartCoroutine(ExportStatus());
+    }
+
+    IEnumerator ExportStatus()
+    {
+        exportStatusTextParent.SetActive(true);
+        exportStatusText.text = "Data Exported!";
+        yield return new WaitForSeconds(2);
+        exportStatusText.text = "";
+        exportStatusTextParent.SetActive(false);
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created

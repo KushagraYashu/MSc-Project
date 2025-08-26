@@ -25,7 +25,7 @@ public class EloSystemManager : MonoBehaviour
     [Header("Match Properties")]
     public int maxRoundsPerMatch;
     public int teamSize = 5;
-    public float eloThreshold = 10f;
+    public float eloThreshold = 25f;
 
     [Header("Verification")]
     public TMP_Text[] answerTexts;
@@ -91,8 +91,29 @@ public class EloSystemManager : MonoBehaviour
         
     }
 
+    void ClearEverything()
+    {
+        foreach(var pool in poolPlayersList)
+        {
+            pool.playersInPool.Clear();
+            pool.poolSize = 0;
+
+            pool.playersInPool = new();
+        }
+
+        MSEs.Clear();
+        MSEs = new();
+
+        smurfPlayerIDs.Clear();
+        smurfPlayerIDs = new();
+
+        MainServer.instance.ResetIDs();
+    }
+
     public void SetupEloSystem(int MPP)
     {
+        ClearEverything();
+
         totalMatches = MPP;
         StartCoroutine(InitialiseEloSystem(MPP));
     }
@@ -289,9 +310,16 @@ public class EloSystemManager : MonoBehaviour
         MSEs.Add(mse);
     }
 
+    public bool stopWithSave = false;
+    public bool stop = false;
+    public bool doNotSave = false;
     int totalMatchesSimulated = 0;
     IEnumerator SimulateMatches()
     {
+        stopWithSave = false;
+        stop = false;
+        doNotSave = false;
+
         List<Player> allPlayers = new();
         for(int i = 0; i < poolPlayersList.Length; i++)
         {
@@ -305,7 +333,8 @@ public class EloSystemManager : MonoBehaviour
 
         StartCoroutine(CalculateMSE());
 
-        while (totalRemainingPlayers > 0)
+        int globalmin = 0;
+        while (totalRemainingPlayers > 0 && stop == false)
         {
             int randomPool = -1;
             int maxTries = 1000;
@@ -332,7 +361,7 @@ public class EloSystemManager : MonoBehaviour
             {
                 minMatchesPlayed = Mathf.Min(minMatchesPlayed, allPlayers[i].playerData.GamesPlayed);
             }
-
+            globalmin = minMatchesPlayed;
             minMatchPerPlayerText.text = minMatchesPlayed.ToString();
 
             // Checkpoint every 5 matches
@@ -355,21 +384,42 @@ public class EloSystemManager : MonoBehaviour
 
         StartCoroutine(CalculateMSE());
 
-        minMatchPerPlayerText.text = MPP_loc.ToString();
-
-        Debug.Log($"All players in all pools have completed their required matches. Total matches: {totalMatchesSimulated}");
-
-        // Wait for final matches to complete
-        yield return new WaitForSecondsRealtime(10f);
-
-        allPlayers.Clear();
-        for (int i = 0; i < poolPlayersList.Length; i++)
+        if (stopWithSave)
         {
-            allPlayers.AddRange(poolPlayersList[i].playersInPool);
-        }
+            minMatchPerPlayerText.text = globalmin.ToString();
 
-        string time = System.DateTime.Now.ToString("dd-MM-yyyy_HH-mm-ss");
-        StartCoroutine(ExportPlayerDataToCSV(allPlayers, time + $"EloSystem-For-{totalMatches}Matches-PerPlayer-TotPlayerCount-{allPlayers.Count}"));
+            // Wait for final matches to complete
+            yield return new WaitForSecondsRealtime(5f);
+
+            allPlayers.Clear();
+            for (int i = 0; i < poolPlayersList.Length; i++)
+            {
+                allPlayers.AddRange(poolPlayersList[i].playersInPool);
+            }
+
+            string time = System.DateTime.Now.ToString("dd-MM-yyyy_HH-mm-ss");
+            StartCoroutine(ExportPlayerDataToCSV(allPlayers, time + $"EloSystem-For-{globalmin}Matches-PerPlayer-TotPlayerCount-{allPlayers.Count}"));
+        }
+        else if(!doNotSave)
+        {
+            minMatchPerPlayerText.text = MPP_loc.ToString();
+
+            // Wait for final matches to complete
+            yield return new WaitForSecondsRealtime(5f);
+
+            allPlayers.Clear();
+            for (int i = 0; i < poolPlayersList.Length; i++)
+            {
+                allPlayers.AddRange(poolPlayersList[i].playersInPool);
+            }
+
+            string time = System.DateTime.Now.ToString("dd-MM-yyyy_HH-mm-ss");
+            StartCoroutine(ExportPlayerDataToCSV(allPlayers, time + $"EloSystem-For-{totalMatches}Matches-PerPlayer-TotPlayerCount-{allPlayers.Count}"));
+        }
+        else if (doNotSave)
+        {
+
+        }
     }
 
     IEnumerator ExportPlayerDataToCSV(List<Player> allPlayers, string fileName)
@@ -409,16 +459,16 @@ public class EloSystemManager : MonoBehaviour
 
             if (processedPlayers % yieldFrequency == 0)
             {
-                Debug.Log($"Processed {processedPlayers} players...");
                 yield return null; // Let Unity breathe
             }
         }
 
         // Save CSV file
-        string filePath = Path.Combine(Application.persistentDataPath, fileName + ".csv");
+        string s = Directory.GetParent(Application.dataPath).FullName;
+        string filePath = Path.Combine(s, fileName + ".csv");
         File.WriteAllText(filePath, csvContent.ToString());
 
-        Debug.Log($"Excel-compatible CSV successfully written to: {filePath}");
+        UIManager.instance.ShowExportStatus();
 
         StopAllCoroutines();
         GC.Collect();
