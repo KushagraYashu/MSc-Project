@@ -271,6 +271,16 @@ public class MainServer : MonoBehaviour
                 GlickoSystemManager.instance.stop = true;
                 GlickoSystemManager.instance.stopWithSave = true;
                 break;
+
+            case 2: //Vanilla TrueSkill (Moserware)
+                VanillaTrueskillSystemManager.instance.stop = true;
+                VanillaTrueskillSystemManager.instance.stopWithSave = true;
+                break;
+
+            case 3: //SmartMatch
+                SmartMatchSystemManager.instance.stop = true;
+                SmartMatchSystemManager.instance.stopWithSave = true;
+                break;
         }
 
         isSimulationStopped = true;
@@ -289,6 +299,16 @@ public class MainServer : MonoBehaviour
             case 1: //Glicko
                 GlickoSystemManager.instance.stop = true;
                 GlickoSystemManager.instance.doNotSave = true;
+                break;
+
+            case 2: //Vanilla TrueSkill (Moserware)
+                VanillaTrueskillSystemManager.instance.stop = true;
+                VanillaTrueskillSystemManager.instance.doNotSave = true;
+                break;
+
+            case 3: //SmartMatch
+                SmartMatchSystemManager.instance.stop = true;
+                SmartMatchSystemManager.instance.doNotSave = true;
                 break;
         }
     }
