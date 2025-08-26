@@ -44,6 +44,8 @@ public class UIManager : MonoBehaviour
 
     [SerializeField] private TMP_Text exportStatusText;
     [SerializeField] private GameObject exportStatusTextParent;
+    [SerializeField] private TMP_Text playerAddedStatusText;
+    [SerializeField] private GameObject playerAddedStatusTextParent;
 
     //internal variables
     int showPlayerIndex = 0;
@@ -247,7 +249,21 @@ public class UIManager : MonoBehaviour
         curPage = 1;
     }
 
+    public void Next5Page()
+    {
+        for(int i = 0; i < 5; i++)
+        {
+            NextPage();
+        }
+    }
     
+    public void Prev5Page()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            PrevPage();
+        }
+    }
 
     public void NextPage()
     {
@@ -428,6 +444,20 @@ public class UIManager : MonoBehaviour
         yield return new WaitForSeconds(2);
         exportStatusText.text = "";
         exportStatusTextParent.SetActive(false);
+    }
+
+    public void ShowPlayerAddedStatus(string msg)
+    {
+        StartCoroutine(PlayerAdded(msg));
+    }
+
+    IEnumerator PlayerAdded(string msg)
+    {
+        playerAddedStatusTextParent.SetActive(true);
+        playerAddedStatusText.text = msg;
+        yield return new WaitForSeconds(2);
+        playerAddedStatusText.text = "";
+        playerAddedStatusTextParent.SetActive(false);
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created

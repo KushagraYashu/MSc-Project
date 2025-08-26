@@ -227,7 +227,7 @@ public class VanillaTrueskillSystemManager : MonoBehaviour
                 poolPlayersList[i].playersInPool.Add(newPlayer);
                 poolPlayersList[i].UpdatePoolSize(i);
 
-                Debug.LogError($"new player with ID {newPlayer.playerData.Id} and rating {newPlayer.playerData.Elo} added to pool {newPlayer.playerData.Pool}\nConfirmation from pool list {poolPlayersList[i].playersInPool.Contains(newPlayer)}");
+                UIManager.instance.ShowPlayerAddedStatus($"A new player with ID: {newPlayer.playerData.Id} and rating: {ConvertRating((float)newPlayer.playerData.TrueSkillRating.Mean, minEloGlobal, maxEloGlobal, RatingConversion.To_MyScale)} added to pool {newPlayer.playerData.Pool + 1}");
 
                 break;
             }

@@ -276,6 +276,7 @@ public class MainServer : MonoBehaviour
         isSimulationStopped = true;
     }
 
+
     public void StopWithoutSave()
     {
         switch (_systemIndex)
@@ -301,6 +302,16 @@ public class MainServer : MonoBehaviour
 
         UIManager.instance.SimulationScreen.SetActive(false);
         UIManager.instance.FirstScreen.SetActive(true);
+    }
+
+    public void ExitTheProject()
+    {
+        Invoke(nameof(Quit), 2f);
+    }
+
+    void Quit()
+    {
+        Application.Quit();
     }
 
 }
